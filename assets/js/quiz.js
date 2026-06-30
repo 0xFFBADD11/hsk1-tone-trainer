@@ -36,6 +36,27 @@ export function createQuiz(words, rand = Math.random) {
     advance() {
       index += 1
     },
+    // Step back to the previous word (scores are kept, keyed by position).
+    back() {
+      if (index > 0) index -= 1
+    },
+    // Jump to an arbitrary word (e.g. from the word list).
+    goTo(i) {
+      if (i >= 0 && i < order.length) index = i
+    },
+    currentIndex() {
+      return index
+    },
+    // The best recorded score for a given word position, or undefined.
+    scoreAt(i) {
+      return scores.get(i)
+    },
+    // Attempted words with their best score, lowest first (most practice needed).
+    attempts() {
+      return [...scores.entries()]
+        .map(([i, score]) => ({ index: i, word: order[i], score }))
+        .sort((a, b) => a.score - b.score)
+    },
     isDone() {
       return index >= order.length
     },

@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630l'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630l'
-import { el, clear } from './dom.js?v=20260630l'
-import { speak, speechSupported } from './speech.js?v=20260630l'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630l'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630l'
-import { createQuiz } from './quiz.js?v=20260630l'
+import { HSK1 } from '../data/hsk1.js?v=20260630m'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630m'
+import { el, clear } from './dom.js?v=20260630m'
+import { speak, speechSupported } from './speech.js?v=20260630m'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630m'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630m'
+import { createQuiz } from './quiz.js?v=20260630m'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -59,7 +59,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630l · score-matches-plot'
+const BUILD = '20260630m · back-and-wordlist'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -100,19 +100,71 @@ function renderStrictness() {
   ])
 }
 
+// Fill the top bar: prominent word count and a green mastered badge.
+function fillTopbar(node) {
+  if (!node) return
+  clear(node)
+  const { position, total } = quiz.progress()
+  node.append(el('span', { class: 'progress-count', text: `Word ${position} / ${total}` }))
+  if (mastered.size) {
+    node.append(el('span', { class: 'mastered-badge', text: `✓ ${mastered.size} mastered` }))
+  }
+}
+
+// Fill the side word list: attempted words with their best percent, lowest
+// (most practice needed) first, clickable to jump back to that word.
+function fillWordList(node) {
+  if (!node) return
+  clear(node)
+  const attempts = quiz.attempts()
+  node.append(el('h3', { class: 'wordlist-title', text: 'Needs practice' }))
+  if (attempts.length === 0) {
+    node.append(el('p', { class: 'wordlist-empty', text: 'Scored words appear here, lowest first.' }))
+    return
+  }
+  const cur = quiz.currentIndex()
+  const items = el('div', { class: 'wordlist-items' })
+  for (const a of attempts) {
+    const pct = scorePercent(a.score)
+    const ok = pct >= ACCEPT_PERCENT
+    items.append(el('button', {
+      class: `wl-item ${ok ? 'good' : 'bad'} ${a.index === cur ? 'current' : ''}`,
+      onclick: () => jumpTo(a.index)
+    }, [
+      el('span', { class: 'wl-hanzi', text: a.word.hanzi }),
+      el('span', { class: 'wl-pct', text: `${pct}%` })
+    ]))
+  }
+  node.append(items)
+}
+
+// When returning to a word that was already scored, restore its result status:
+// ring the card and note the best percent so far.
+function showBest(best) {
+  const pct = scorePercent(best)
+  const passed = pct >= ACCEPT_PERCENT
+  const card = document.getElementById('word-card')
+  if (card) {
+    card.classList.toggle('pass', passed)
+    card.classList.toggle('fail', !passed)
+  }
+  const fb = document.getElementById('feedback')
+  if (!fb) return
+  clear(fb)
+  fb.className = 'feedback shown'
+  fb.append(el('p', { class: 'best-note', text: `Best so far: ${pct}%  ${verdict(pct)}` }))
+}
+
 function renderWord() {
   const word = quiz.current()
   if (!word) return renderSummary()
-  const { position, total } = quiz.progress()
 
   clear(app)
-  app.append(
-    el('div', { class: 'topbar' }, [
-      el('span', { class: 'progress-count', text: `Word ${position} / ${total}` }),
-      mastered.size
-        ? el('span', { class: 'mastered-badge', text: `✓ ${mastered.size} mastered` })
-        : null
-    ]),
+  const backAttrs = { class: 'btn ghost back', text: '← Back', onclick: () => prevWord() }
+  if (quiz.currentIndex() === 0) backAttrs.disabled = 'disabled'
+
+  const practice = el('div', { class: 'practice' }, [
+    el('div', { class: 'topbar', id: 'topbar' }),
     el('div', { class: 'practice-grid' }, [
       el('div', { class: 'card', id: 'word-card' }, [
         el('div', { class: 'hanzi', text: word.hanzi }),
@@ -131,7 +183,8 @@ function renderWord() {
         el('div', { class: 'meter', id: 'meter' }, [
           el('div', { class: 'meter-bar', id: 'meter-bar' })
         ]),
-        el('div', { class: 'controls' }, [
+        el('div', { class: 'controls nav' }, [
+          el('button', backAttrs),
           el('button', { class: 'btn ghost next', text: 'Next →', onclick: () => nextWord() })
         ])
       ])
@@ -139,8 +192,20 @@ function renderWord() {
     el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),
     renderStrictness()
-  )
+  ])
+
+  app.append(el('div', { class: 'layout' }, [
+    practice,
+    el('aside', { class: 'wordlist', id: 'wordlist' })
+  ]))
+  fillTopbar(document.getElementById('topbar'))
+  fillWordList(document.getElementById('wordlist'))
   wireRecordButton(word)
+
+  // Restore the prior result if this word was already scored this session.
+  const best = quiz.scoreAt(quiz.currentIndex())
+  if (best !== undefined) showBest(best)
+
   // Play the word automatically when it appears (after the first user gesture;
   // browsers may suppress the very first utterance until the page is tapped).
   speak(word.hanzi)
@@ -332,6 +397,10 @@ function showResult(word, result, percent) {
     el('ul', { class: 'syllables' }, rows)
   )
   for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
+
+  // The score just changed: refresh the mastered badge and the word list.
+  fillTopbar(document.getElementById('topbar'))
+  fillWordList(document.getElementById('wordlist'))
 }
 
 function setFeedback(message, kind) {
@@ -347,6 +416,18 @@ function nextWord() {
   quiz.advance()
   if (quiz.isDone()) renderSummary()
   else renderWord()
+}
+
+// Go back to the previous word; its recorded best score is preserved.
+function prevWord() {
+  quiz.back()
+  renderWord()
+}
+
+// Jump to any previously scored word from the word list.
+function jumpTo(index) {
+  quiz.goTo(index)
+  renderWord()
 }
 
 function renderSummary() {
