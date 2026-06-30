@@ -1,0 +1,21 @@
+{
+  "name": "hsk1-tone-trainer",
+  "version": "1.0.0",
+  "description": "Browser-based HSK 1 Mandarin vocabulary trainer with pronunciation, pinyin, and microphone tone scoring.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint .",
+    "fuzz": "jazzer fuzz/tone.fuzz.mjs --sync -- -runs=20000",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@jazzer.js/core": "^2.1.0",
+    "eslint": "^9.0.0",
+    "wrangler": "^3.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "license": "MIT"
+}

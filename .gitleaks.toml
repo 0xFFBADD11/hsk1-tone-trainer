@@ -1,0 +1,4 @@
+title = "hsk1-tone-trainer gitleaks config"
+
+[extend]
+useDefault = true

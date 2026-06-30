@@ -1,0 +1,100 @@
+:root {
+  --bg: #0f1115;
+  --panel: #1a1d24;
+  --accent: #e23744;
+  --accent-soft: #ff6b75;
+  --text: #f2f3f5;
+  --muted: #9aa0ab;
+  --good: #2ecc71;
+  --warn: #f1c40f;
+  --bad: #e74c3c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+header {
+  text-align: center;
+  padding: 2rem 1rem 1rem;
+}
+
+header h1 { margin: 0; font-size: 1.8rem; }
+.tagline { color: var(--muted); margin: 0.4rem 0 0; }
+
+main {
+  width: 100%;
+  max-width: 32rem;
+  padding: 1rem;
+  flex: 1;
+}
+
+.progress { color: var(--muted); text-align: center; margin: 0 0 0.75rem; }
+
+.card {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.hanzi { font-size: 4.5rem; line-height: 1.1; }
+.pinyin { font-size: 1.6rem; color: var(--accent-soft); margin-top: 0.5rem; }
+.english { color: var(--muted); margin-top: 0.4rem; }
+
+.controls {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.05s ease, background 0.15s ease;
+}
+.btn:hover { background: var(--accent-soft); }
+.btn:active { transform: scale(0.97); }
+.btn.ghost { background: transparent; border: 1px solid var(--muted); color: var(--muted); }
+.btn.record.active { background: var(--bad); box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.3); }
+
+.feedback {
+  margin-top: 1.25rem;
+  min-height: 1.5rem;
+  text-align: center;
+}
+.feedback.shown { background: var(--panel); border-radius: 12px; padding: 1rem; }
+.feedback.error { color: var(--bad); }
+.feedback.info { color: var(--muted); }
+
+.score { font-size: 1.4rem; font-weight: 600; }
+
+.syllables { list-style: none; padding: 0; margin: 0.75rem 0; text-align: left; }
+.syllables li { color: var(--muted); padding: 0.25rem 0; font-size: 0.95rem; }
+.syllables .syl { color: var(--accent-soft); margin-right: 0.5rem; }
+
+.summary h2 { margin-top: 0; }
+
+footer {
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}

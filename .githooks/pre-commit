@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Pre-commit gate mirroring CI. Enable once with:
+#   git config core.hooksPath hsk1-vocab-app/.githooks
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --config .gitleaks.toml
+else
+  echo 'warning: gitleaks not installed; skipping secret scan' >&2
+fi
+
+pnpm run lint
+node --test

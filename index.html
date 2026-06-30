@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- CSP fallback for static hosts (e.g. GitHub Pages) that cannot set
+       response headers; mirrors the Cloudflare Worker policy where meta
+       directives are honored. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; base-uri 'none'; object-src 'none'">
+  <title>HSK 1 Tone Trainer</title>
+  <meta name="description" content="Practice HSK 1 Mandarin vocabulary with pronunciation, pinyin, and microphone-based tone scoring.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>HSK 1 Tone Trainer</h1>
+    <p class="tagline">Listen, repeat, and get your Mandarin tones scored.</p>
+  </header>
+  <main id="app"></main>
+  <footer>
+    <p>All recording and scoring happen in your browser. No audio is uploaded.</p>
+  </footer>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
