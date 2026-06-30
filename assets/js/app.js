@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630g'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630g'
-import { el, clear } from './dom.js?v=20260630g'
-import { speak, speechSupported } from './speech.js?v=20260630g'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630g'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630g'
-import { createQuiz } from './quiz.js?v=20260630g'
+import { HSK1 } from '../data/hsk1.js?v=20260630h'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630h'
+import { el, clear } from './dom.js?v=20260630h'
+import { speak, speechSupported } from './speech.js?v=20260630h'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630h'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630h'
+import { createQuiz } from './quiz.js?v=20260630h'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -15,9 +15,45 @@ const SLOW_RATE = 0.4
 // A tone score at or above this percent counts as acceptable ("mastered").
 const ACCEPT_PERCENT = 70
 
+// Selectable strictness. `gamma` shapes the scoring curve (see scoreWord);
+// lower = more forgiving. Native (default) lets a fluent speaker score near
+// the top while staying encouraging for learners.
+const STRICTNESS = {
+  native: { label: 'Native', gamma: 0.45 },
+  solid: { label: 'Solid', gamma: 0.8 },
+  strict: { label: 'Strict', gamma: 1.6 }
+}
+
+function loadStrictness() {
+  try {
+    const v = window.localStorage.getItem('strictness')
+    if (v && STRICTNESS[v]) return v
+  } catch {
+    // localStorage may be unavailable (private mode); fall through to default.
+  }
+  return 'native'
+}
+
+let strictness = loadStrictness()
+
+function setStrictness(level) {
+  if (!STRICTNESS[level]) return
+  strictness = level
+  try {
+    window.localStorage.setItem('strictness', level)
+  } catch {
+    // Non-fatal: the choice just won't persist across reloads.
+  }
+  const box = document.getElementById('strictness')
+  if (!box) return
+  for (const btn of box.querySelectorAll('.chip')) {
+    btn.classList.toggle('active', btn.dataset.level === level)
+  }
+}
+
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630g · tone-scoring-v2'
+const BUILD = '20260630h · strictness'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -46,6 +82,17 @@ function renderWord() {
   const progressText = `Word ${position} of ${total}` +
     (mastered.size ? ` · ✓ ${mastered.size} mastered` : '')
   app.append(
+    el('div', { class: 'strictness', id: 'strictness' }, [
+      el('span', { class: 'strictness-label', text: 'Strictness' }),
+      ...Object.keys(STRICTNESS).map((key) =>
+        el('button', {
+          class: `chip ${key === strictness ? 'active' : ''}`,
+          'data-level': key,
+          text: STRICTNESS[key].label,
+          onclick: () => setStrictness(key)
+        })
+      )
+    ]),
     el('p', { class: 'progress', text: progressText }),
     el('div', { class: 'card', id: 'word-card' }, [
       el('div', { class: 'hanzi', text: word.hanzi }),
@@ -156,7 +203,7 @@ function evaluate(word, capture) {
     )
     return
   }
-  const result = scoreWord(contour, word.tones)
+  const result = scoreWord(contour, word.tones, STRICTNESS[strictness].gamma)
   const percent = scorePercent(result.overall)
   showResult(word, result, percent)
 }

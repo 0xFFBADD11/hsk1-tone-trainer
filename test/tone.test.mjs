@@ -73,6 +73,15 @@ test('scoreWord splits a two-syllable contour and averages', () => {
   assert.ok(result.overall > 0.5, `overall ${result.overall}`)
 })
 
+test('gamma makes scoring more forgiving (<1) or harsher (>1)', () => {
+  const hz = [...silence(4), ...ramp(-2, 3), ...silence(4)] // a decent tone 2
+  const linear = scoreWord(hz, [2], 1).overall
+  const forgiving = scoreWord(hz, [2], 0.45).overall
+  const harsh = scoreWord(hz, [2], 1.6).overall
+  assert.ok(forgiving >= linear, `forgiving ${forgiving} < linear ${linear}`)
+  assert.ok(harsh <= linear, `harsh ${harsh} > linear ${linear}`)
+})
+
 test('too-short or empty input yields zero score, not a crash', () => {
   assert.equal(scoreWord([], [1]).overall, 0)
   assert.equal(scoreWord([0, 0, 0], [1]).overall, 0)

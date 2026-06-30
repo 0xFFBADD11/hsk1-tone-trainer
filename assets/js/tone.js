@@ -160,8 +160,10 @@ export function scoreSyllable(sylHz, expectedTone, floorSt = 0, ceilSt = 0) {
 }
 
 // Score a whole-word F0 contour (Hz, 0 for unvoiced frames) against the expected
-// per-syllable tones. Returns per-syllable results plus the averaged overall.
-export function scoreWord(contourHz, expectedTones) {
+// per-syllable tones. `gamma` shapes the strictness curve: < 1 is forgiving
+// (lifts partial scores), 1 is linear, > 1 is harsh. Returns per-syllable
+// results plus the averaged overall.
+export function scoreWord(contourHz, expectedTones, gamma = 1) {
   const count = expectedTones.length
   const clean = cleanContour(Array.from(contourHz))
   const segs = segment(clean, count)
@@ -172,7 +174,10 @@ export function scoreWord(contourHz, expectedTones) {
   const floorSt = percentile(allSemis, 0.1)
   const ceilSt = percentile(allSemis, 0.9)
 
-  const syllables = expectedTones.map((tone, i) => scoreSyllable(segs[i], tone, floorSt, ceilSt))
+  const syllables = expectedTones.map((tone, i) => {
+    const r = scoreSyllable(segs[i], tone, floorSt, ceilSt)
+    return { score: clamp01(r.score ** gamma), detected: r.detected }
+  })
   const overall = mean(syllables.map((s) => s.score))
   return { overall: clamp01(overall), syllables }
 }

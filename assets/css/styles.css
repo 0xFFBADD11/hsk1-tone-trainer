@@ -40,6 +40,28 @@ main {
 
 .progress { color: var(--muted); text-align: center; margin: 0 0 0.75rem; }
 
+.strictness {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.strictness-label { color: var(--muted); font-size: 0.85rem; margin-right: 0.2rem; }
+.chip {
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 .card {
   background: var(--panel);
   border-radius: 16px;
