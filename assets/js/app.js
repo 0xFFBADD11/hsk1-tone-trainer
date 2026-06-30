@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630h'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630h'
-import { el, clear } from './dom.js?v=20260630h'
-import { speak, speechSupported } from './speech.js?v=20260630h'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630h'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630h'
-import { createQuiz } from './quiz.js?v=20260630h'
+import { HSK1 } from '../data/hsk1.js?v=20260630i'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630i'
+import { el, clear } from './dom.js?v=20260630i'
+import { speak, speechSupported } from './speech.js?v=20260630i'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630i'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630i'
+import { createQuiz } from './quiz.js?v=20260630i'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -53,7 +53,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630h · strictness'
+const BUILD = '20260630i · ui-compact'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -82,33 +82,39 @@ function renderWord() {
   const progressText = `Word ${position} of ${total}` +
     (mastered.size ? ` · ✓ ${mastered.size} mastered` : '')
   app.append(
-    el('div', { class: 'strictness', id: 'strictness' }, [
-      el('span', { class: 'strictness-label', text: 'Strictness' }),
-      ...Object.keys(STRICTNESS).map((key) =>
-        el('button', {
-          class: `chip ${key === strictness ? 'active' : ''}`,
-          'data-level': key,
-          text: STRICTNESS[key].label,
-          onclick: () => setStrictness(key)
-        })
-      )
+    el('div', { class: 'topbar' }, [
+      el('p', { class: 'progress', text: progressText }),
+      el('div', { class: 'strictness', id: 'strictness' }, [
+        el('span', { class: 'strictness-label', text: 'Strictness' }),
+        ...Object.keys(STRICTNESS).map((key) =>
+          el('button', {
+            class: `chip ${key === strictness ? 'active' : ''}`,
+            'data-level': key,
+            text: STRICTNESS[key].label,
+            onclick: () => setStrictness(key)
+          })
+        )
+      ])
     ]),
-    el('p', { class: 'progress', text: progressText }),
-    el('div', { class: 'card', id: 'word-card' }, [
-      el('div', { class: 'hanzi', text: word.hanzi }),
-      el('div', { class: 'pinyin', text: word.pinyin }),
-      el('div', { class: 'english', text: word.en })
-    ]),
-    el('div', { class: 'controls' }, [
-      el('button', { class: 'btn', text: '▶️ Play', onclick: () => speak(word.hanzi) }),
-      el('button', { class: 'btn ghost', text: '🐢 Slow', onclick: () => speak(word.hanzi, SLOW_RATE) }),
-      el('button', { class: 'btn ghost', text: '💬 Sentence', onclick: () => playSentence(word) })
-    ]),
-    el('div', { class: 'controls' }, [
-      el('button', { class: 'btn record', text: '🎤 Hold to record', id: 'record-btn' })
-    ]),
-    el('div', { class: 'meter', id: 'meter' }, [
-      el('div', { class: 'meter-bar', id: 'meter-bar' })
+    el('div', { class: 'practice-grid' }, [
+      el('div', { class: 'card', id: 'word-card' }, [
+        el('div', { class: 'hanzi', text: word.hanzi }),
+        el('div', { class: 'pinyin', text: word.pinyin }),
+        el('div', { class: 'english', text: word.en })
+      ]),
+      el('div', { class: 'col-right' }, [
+        el('div', { class: 'controls playback' }, [
+          el('button', { class: 'btn', text: '▶️ Play', onclick: () => speak(word.hanzi) }),
+          el('button', { class: 'btn ghost', text: '🐢 Slow', onclick: () => speak(word.hanzi, SLOW_RATE) }),
+          el('button', { class: 'btn ghost', text: '💬 Sentence', onclick: () => playSentence(word) })
+        ]),
+        el('div', { class: 'controls' }, [
+          el('button', { class: 'btn record', text: '🎤 Hold to record', id: 'record-btn' })
+        ]),
+        el('div', { class: 'meter', id: 'meter' }, [
+          el('div', { class: 'meter-bar', id: 'meter-bar' })
+        ])
+      ])
     ]),
     el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),

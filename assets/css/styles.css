@@ -25,37 +25,45 @@ body {
 
 header {
   text-align: center;
-  padding: 2rem 1rem 1rem;
+  padding: 1rem 1rem 0.5rem;
 }
 
-header h1 { margin: 0; font-size: 1.8rem; }
-.tagline { color: var(--muted); margin: 0.4rem 0 0; }
+header h1 { margin: 0; font-size: 1.4rem; }
+.tagline { color: var(--muted); margin: 0.25rem 0 0; font-size: 0.9rem; }
 
 main {
   width: 100%;
   max-width: 32rem;
-  padding: 1rem;
+  padding: 0.75rem 1rem 1rem;
   flex: 1;
 }
 
-.progress { color: var(--muted); text-align: center; margin: 0 0 0.75rem; }
+/* Compact top bar: progress on the left, strictness control on the right.
+   Wraps to two lines only on very narrow screens. */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.progress { color: var(--muted); margin: 0; font-size: 0.9rem; }
 
 .strictness {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 0.75rem;
+  gap: 0.3rem;
 }
-.strictness-label { color: var(--muted); font-size: 0.85rem; margin-right: 0.2rem; }
+.strictness-label { color: var(--muted); font-size: 0.8rem; margin-right: 0.1rem; }
 .chip {
   background: transparent;
   border: 1px solid var(--muted);
   color: var(--muted);
   border-radius: 999px;
-  padding: 0.25rem 0.7rem;
-  font-size: 0.85rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
@@ -65,7 +73,7 @@ main {
 .card {
   background: var(--panel);
   border-radius: 16px;
-  padding: 2rem 1.5rem;
+  padding: 1.25rem 1.5rem;
   text-align: center;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
@@ -74,24 +82,28 @@ main {
 .card.pass { box-shadow: 0 0 0 3px var(--good), 0 8px 30px rgba(0, 0, 0, 0.35); }
 .card.fail { box-shadow: 0 0 0 3px var(--bad), 0 8px 30px rgba(0, 0, 0, 0.35); }
 
-.hanzi { font-size: 4.5rem; line-height: 1.1; }
-.pinyin { font-size: 1.6rem; color: var(--accent-soft); margin-top: 0.5rem; }
-.english { color: var(--muted); margin-top: 0.4rem; }
+.hanzi { font-size: 3.5rem; line-height: 1.1; }
+.pinyin { font-size: 1.4rem; color: var(--accent-soft); margin-top: 0.3rem; }
+.english { color: var(--muted); margin-top: 0.25rem; font-size: 0.95rem; }
 
 .controls {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.6rem;
   justify-content: center;
-  margin-top: 1.25rem;
+  margin-top: 0.75rem;
   flex-wrap: wrap;
 }
+
+/* The playback row (Play / Slow / Sentence) sits directly under the card and
+   reads as a single grouped control strip. */
+.controls.playback { margin-top: 0.75rem; }
 
 .btn {
   background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 10px;
-  padding: 0.7rem 1.2rem;
+  padding: 0.6rem 1.1rem;
   font-size: 1rem;
   cursor: pointer;
   transition: transform 0.05s ease, background 0.15s ease;
@@ -101,15 +113,20 @@ main {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-.btn.record { touch-action: none; }
+.btn.record {
+  touch-action: none;
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  font-size: 1.05rem;
+}
 .btn:hover { background: var(--accent-soft); }
 .btn:active { transform: scale(0.97); }
 .btn.ghost { background: transparent; border: 1px solid var(--muted); color: var(--muted); }
 .btn.record.active { background: var(--bad); box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.3); }
 
 .meter {
-  height: 10px;
-  margin-top: 1rem;
+  height: 8px;
+  margin-top: 0.6rem;
   background: var(--bg);
   border: 1px solid var(--panel);
   border-radius: 6px;
@@ -123,33 +140,34 @@ main {
 }
 
 .example {
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   text-align: center;
 }
 .example.shown {
   background: var(--panel);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.75rem;
 }
-.ex-hanzi { font-size: 1.6rem; line-height: 1.3; }
-.ex-pinyin { color: var(--accent-soft); margin-top: 0.3rem; }
+.ex-hanzi { font-size: 1.5rem; line-height: 1.3; }
+.ex-pinyin { color: var(--accent-soft); margin-top: 0.25rem; }
 .ex-en { color: var(--muted); margin-top: 0.2rem; font-size: 0.95rem; }
 
 .feedback {
-  margin-top: 1.25rem;
-  min-height: 1.5rem;
+  margin-top: 0.75rem;
   text-align: center;
 }
-.feedback.shown { background: var(--panel); border-radius: 12px; padding: 1rem; }
+/* Empty feedback should take no space; padding/min-height kick in once shown. */
+.feedback:empty { margin-top: 0; }
+.feedback.shown { background: var(--panel); border-radius: 12px; padding: 0.85rem; }
 .feedback.error { color: var(--bad); }
 .feedback.info { color: var(--muted); }
 
-.score { font-size: 1.4rem; font-weight: 600; }
-.pass-badge { font-weight: 600; margin: 0.4rem 0; color: var(--good); }
+.score { font-size: 1.3rem; font-weight: 600; }
+.pass-badge { font-weight: 600; margin: 0.35rem 0; color: var(--good); }
 .feedback.fail .pass-badge { color: var(--warn); }
 
-.syllables { list-style: none; padding: 0; margin: 0.75rem 0; text-align: left; }
-.syllables li { color: var(--muted); padding: 0.25rem 0; font-size: 0.95rem; }
+.syllables { list-style: none; padding: 0; margin: 0.6rem 0 0; text-align: left; }
+.syllables li { color: var(--muted); padding: 0.2rem 0; font-size: 0.95rem; }
 .syllables .syl { color: var(--accent-soft); margin-right: 0.5rem; }
 
 .summary h2 { margin-top: 0; }
@@ -157,7 +175,29 @@ main {
 footer {
   color: var(--muted);
   font-size: 0.8rem;
-  padding: 1.5rem 1rem;
+  padding: 1rem 1rem;
   text-align: center;
 }
-.build { font-size: 0.7rem; opacity: 0.6; margin: 0.5rem 0 0; }
+footer p { margin: 0.25rem 0; }
+.build { font-size: 0.7rem; opacity: 0.6; margin: 0.35rem 0 0; }
+
+/* On wider viewports, place the word card and the record control side by side
+   so the core loop fits without scrolling, while phones stay single-column. */
+@media (min-width: 34rem) {
+  main { max-width: 40rem; }
+  .practice-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+  .practice-grid .card { margin: 0; }
+  .practice-grid .col-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.6rem;
+    height: 100%;
+  }
+  .practice-grid .col-right .controls { margin-top: 0; }
+}
