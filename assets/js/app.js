@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630f'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630f'
-import { el, clear } from './dom.js?v=20260630f'
-import { speak, speechSupported } from './speech.js?v=20260630f'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630f'
-import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630f'
-import { createQuiz } from './quiz.js?v=20260630f'
+import { HSK1 } from '../data/hsk1.js?v=20260630g'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630g'
+import { el, clear } from './dom.js?v=20260630g'
+import { speak, speechSupported } from './speech.js?v=20260630g'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630g'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630g'
+import { createQuiz } from './quiz.js?v=20260630g'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -17,7 +17,7 @@ const ACCEPT_PERCENT = 70
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630f · single-next'
+const BUILD = '20260630g · tone-scoring-v2'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -148,8 +148,7 @@ function setMeter(level) {
 
 function evaluate(word, capture) {
   const { contour, frames, voiced, peak } = capture
-  const semitones = toSemitones(contour)
-  if (semitones.length < word.tones.length * 2) {
+  if (voiced < word.tones.length * 3) {
     setFeedback(
       'Too quiet or too short — try speaking the whole word. ' +
         `(frames ${frames}, peak ${peak.toFixed(3)}, voiced ${voiced})`,
@@ -157,7 +156,7 @@ function evaluate(word, capture) {
     )
     return
   }
-  const result = scoreWord(semitones, word.tones)
+  const result = scoreWord(contour, word.tones)
   const percent = scorePercent(result.overall)
   showResult(word, result, percent)
 }
