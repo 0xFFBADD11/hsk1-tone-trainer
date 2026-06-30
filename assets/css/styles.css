@@ -51,10 +51,14 @@ main {
 
 .progress { color: var(--muted); margin: 0; font-size: 0.9rem; }
 
+/* Strictness selector lives at the bottom of the practice view, out of the way. */
 .strictness {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
+  margin-top: 1.5rem;
+  opacity: 0.85;
 }
 .strictness-label { color: var(--muted); font-size: 0.8rem; margin-right: 0.1rem; }
 .chip {
@@ -82,9 +86,9 @@ main {
 .card.pass { box-shadow: 0 0 0 3px var(--good), 0 8px 30px rgba(0, 0, 0, 0.35); }
 .card.fail { box-shadow: 0 0 0 3px var(--bad), 0 8px 30px rgba(0, 0, 0, 0.35); }
 
-.hanzi { font-size: 3.5rem; line-height: 1.1; }
-.pinyin { font-size: 1.4rem; color: var(--accent-soft); margin-top: 0.3rem; }
-.english { color: var(--muted); margin-top: 0.25rem; font-size: 0.95rem; }
+.hanzi { font-size: 4.5rem; line-height: 1.1; }
+.pinyin { font-size: 1.6rem; color: var(--accent-soft); margin-top: 0.4rem; }
+.english { color: var(--muted); margin-top: 0.3rem; font-size: 1rem; }
 
 .controls {
   display: flex;
@@ -94,9 +98,9 @@ main {
   flex-wrap: wrap;
 }
 
-/* The playback row (Play / Slow / Sentence) sits directly under the card and
-   reads as a single grouped control strip. */
-.controls.playback { margin-top: 0.75rem; }
+/* Playback row: three equal-width icon buttons (description shown as a hover
+   tooltip), grouped directly under the card. */
+.controls.playback { margin-top: 0.75rem; gap: 0.5rem; }
 
 .btn {
   background: var(--accent);
@@ -123,6 +127,20 @@ main {
 .btn:active { transform: scale(0.97); }
 .btn.ghost { background: transparent; border: 1px solid var(--muted); color: var(--muted); }
 .btn.record.active { background: var(--bad); box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.3); }
+
+/* Equal-width icon playback buttons; uniform and distinct from the red record
+   button. */
+.btn.icon {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 1.4rem;
+  padding: 0.5rem 0;
+}
+.btn.icon:hover { background: var(--accent); }
+/* Next sits under the record button as part of the same control column. */
+.btn.next { width: 100%; }
 
 .meter {
   height: 8px;

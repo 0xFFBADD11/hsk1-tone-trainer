@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630j'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630j'
-import { el, clear } from './dom.js?v=20260630j'
-import { speak, speechSupported } from './speech.js?v=20260630j'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630j'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630j'
-import { createQuiz } from './quiz.js?v=20260630j'
+import { HSK1 } from '../data/hsk1.js?v=20260630k'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630k'
+import { el, clear } from './dom.js?v=20260630k'
+import { speak, speechSupported } from './speech.js?v=20260630k'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630k'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630k'
+import { createQuiz } from './quiz.js?v=20260630k'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -59,7 +59,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630j · pitch-overlay'
+const BUILD = '20260630k · button-layout'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -79,6 +79,27 @@ function verdict(percent) {
   return '🔴 Tones need work'
 }
 
+// Equal-size playback button: just the icon, with the description as a hover
+// tooltip (title) and an accessible label.
+function iconBtn(icon, label, onclick) {
+  return el('button', { class: 'btn icon', title: label, 'aria-label': label, text: icon, onclick })
+}
+
+// Strictness selector, rendered at the bottom of the practice view.
+function renderStrictness() {
+  return el('div', { class: 'strictness', id: 'strictness' }, [
+    el('span', { class: 'strictness-label', text: 'Strictness' }),
+    ...Object.keys(STRICTNESS).map((key) =>
+      el('button', {
+        class: `chip ${key === strictness ? 'active' : ''}`,
+        'data-level': key,
+        text: STRICTNESS[key].label,
+        onclick: () => setStrictness(key)
+      })
+    )
+  ])
+}
+
 function renderWord() {
   const word = quiz.current()
   if (!word) return renderSummary()
@@ -89,18 +110,7 @@ function renderWord() {
     (mastered.size ? ` · ✓ ${mastered.size} mastered` : '')
   app.append(
     el('div', { class: 'topbar' }, [
-      el('p', { class: 'progress', text: progressText }),
-      el('div', { class: 'strictness', id: 'strictness' }, [
-        el('span', { class: 'strictness-label', text: 'Strictness' }),
-        ...Object.keys(STRICTNESS).map((key) =>
-          el('button', {
-            class: `chip ${key === strictness ? 'active' : ''}`,
-            'data-level': key,
-            text: STRICTNESS[key].label,
-            onclick: () => setStrictness(key)
-          })
-        )
-      ])
+      el('p', { class: 'progress', text: progressText })
     ]),
     el('div', { class: 'practice-grid' }, [
       el('div', { class: 'card', id: 'word-card' }, [
@@ -110,23 +120,24 @@ function renderWord() {
       ]),
       el('div', { class: 'col-right' }, [
         el('div', { class: 'controls playback' }, [
-          el('button', { class: 'btn', text: '▶️ Play', onclick: () => speak(word.hanzi) }),
-          el('button', { class: 'btn ghost', text: '🐢 Slow', onclick: () => speak(word.hanzi, SLOW_RATE) }),
-          el('button', { class: 'btn ghost', text: '💬 Sentence', onclick: () => playSentence(word) })
+          iconBtn('▶️', 'Play', () => speak(word.hanzi)),
+          iconBtn('🐢', 'Play slowly', () => speak(word.hanzi, SLOW_RATE)),
+          iconBtn('💬', 'Example sentence', () => playSentence(word))
         ]),
         el('div', { class: 'controls' }, [
           el('button', { class: 'btn record', text: '🎤 Hold to record', id: 'record-btn' })
         ]),
         el('div', { class: 'meter', id: 'meter' }, [
           el('div', { class: 'meter-bar', id: 'meter-bar' })
+        ]),
+        el('div', { class: 'controls' }, [
+          el('button', { class: 'btn ghost next', text: 'Next →', onclick: () => nextWord() })
         ])
       ])
     ]),
     el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),
-    el('div', { class: 'controls' }, [
-      el('button', { class: 'btn ghost', text: 'Next →', onclick: () => nextWord() })
-    ])
+    renderStrictness()
   )
   wireRecordButton(word)
   // Play the word automatically when it appears (after the first user gesture;
