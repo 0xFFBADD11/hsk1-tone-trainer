@@ -12,9 +12,9 @@
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@jazzer.js/core": "^2.1.0",
+    "@jazzer.js/core": "^4.0.0",
     "eslint": "^9.0.0",
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.105.0"
   },
   "packageManager": "pnpm@9.0.0",
   "license": "MIT"
