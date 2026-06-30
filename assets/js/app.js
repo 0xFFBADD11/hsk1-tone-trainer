@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630e'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630e'
-import { el, clear } from './dom.js?v=20260630e'
-import { speak, speechSupported } from './speech.js?v=20260630e'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630e'
-import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630e'
-import { createQuiz } from './quiz.js?v=20260630e'
+import { HSK1 } from '../data/hsk1.js?v=20260630f'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630f'
+import { el, clear } from './dom.js?v=20260630f'
+import { speak, speechSupported } from './speech.js?v=20260630f'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630f'
+import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630f'
+import { createQuiz } from './quiz.js?v=20260630f'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -17,7 +17,7 @@ const ACCEPT_PERCENT = 70
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630e · scoring-record-ux'
+const BUILD = '20260630f · single-next'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -66,7 +66,7 @@ function renderWord() {
     el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),
     el('div', { class: 'controls' }, [
-      el('button', { class: 'btn ghost', text: 'Next →', onclick: () => skipWord() })
+      el('button', { class: 'btn ghost', text: 'Next →', onclick: () => nextWord() })
     ])
   )
   wireRecordButton(word)
@@ -163,6 +163,7 @@ function evaluate(word, capture) {
 }
 
 function showResult(word, result, percent) {
+  quiz.setScore(result.overall)
   const passed = percent >= ACCEPT_PERCENT
   if (passed) mastered.add(word.hanzi)
 
@@ -194,8 +195,7 @@ function showResult(word, result, percent) {
       class: 'pass-badge',
       text: passed ? '✓ Acceptable — tone mastered' : '↻ Not quite — try again'
     }),
-    el('ul', { class: 'syllables' }, rows),
-    el('button', { class: 'btn', text: 'Next word →', onclick: () => advance(result.overall) })
+    el('ul', { class: 'syllables' }, rows)
   )
 }
 
@@ -206,16 +206,10 @@ function setFeedback(message, kind) {
   feedback.append(el('p', { text: message }))
 }
 
-// Move to the next word without recording a score (an unattempted word should
-// not count against the session average).
-function skipWord() {
-  quiz.skip()
-  if (quiz.isDone()) renderSummary()
-  else renderWord()
-}
-
-function advance(score) {
-  quiz.record(score)
+// Move to the next word. The current word's score (if any) was already
+// recorded in showResult, so this only advances.
+function nextWord() {
+  quiz.advance()
   if (quiz.isDone()) renderSummary()
   else renderWord()
 }

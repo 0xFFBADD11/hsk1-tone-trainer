@@ -16,7 +16,8 @@ export function shuffle(items, rand = Math.random) {
 export function createQuiz(words, rand = Math.random) {
   const order = shuffle(words, rand)
   let index = 0
-  const scores = []
+  // Best 0..1 score per attempted word, keyed by its position in `order`.
+  const scores = new Map()
 
   return {
     current() {
@@ -25,22 +26,24 @@ export function createQuiz(words, rand = Math.random) {
     progress() {
       return { position: index + 1, total: order.length }
     },
-    // Record a 0..1 score for the current word and advance.
-    record(score) {
-      scores.push({ word: order[index], score })
-      index += 1
+    // Record a 0..1 score for the current word, keeping the best attempt.
+    // Does not advance, so a word can be re-recorded before moving on.
+    setScore(score) {
+      const prev = scores.get(index)
+      if (prev === undefined || score > prev) scores.set(index, score)
     },
-    // Advance without recording a score (the word was not attempted).
-    skip() {
+    // Move to the next word. Unattempted words simply have no recorded score.
+    advance() {
       index += 1
     },
     isDone() {
       return index >= order.length
     },
     summary() {
-      if (scores.length === 0) return { count: 0, average: 0, scores: [] }
-      const average = scores.reduce((s, r) => s + r.score, 0) / scores.length
-      return { count: scores.length, average, scores: scores.slice() }
+      const values = [...scores.values()]
+      if (values.length === 0) return { count: 0, average: 0, scores: [] }
+      const average = values.reduce((s, v) => s + v, 0) / values.length
+      return { count: values.length, average, scores: values }
     }
   }
 }
