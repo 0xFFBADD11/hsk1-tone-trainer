@@ -1,9 +1,17 @@
-import { HSK1 } from '../data/hsk1.js'
-import { el, clear } from './dom.js'
-import { speak, speechSupported } from './speech.js'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js'
-import { toSemitones, scoreWord, TONE_NAMES } from './tone.js'
-import { createQuiz } from './quiz.js'
+// The ?v= token must match index.html so the whole module graph is refetched
+// together when a deploy changes it; bump both on every deploy.
+import { HSK1 } from '../data/hsk1.js?v=20260630b'
+import { el, clear } from './dom.js?v=20260630b'
+import { speak, speechSupported } from './speech.js?v=20260630b'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630b'
+import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630b'
+import { createQuiz } from './quiz.js?v=20260630b'
+
+// Visible build stamp. The footer placeholder says "stale cache" until this
+// line runs, so the badge proves the current app.js actually executed.
+const BUILD = '20260630b · mic-fix'
+const buildEl = document.getElementById('build')
+if (buildEl) buildEl.textContent = BUILD
 
 const app = document.getElementById('app')
 const quiz = createQuiz(HSK1)

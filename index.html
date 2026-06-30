@@ -20,7 +20,10 @@
   <main id="app"></main>
   <footer>
     <p>All recording and scoring happen in your browser. No audio is uploaded.</p>
+    <p class="build">build <span id="build">unknown (stale cache)</span></p>
   </footer>
-  <script type="module" src="assets/js/app.js"></script>
+  <!-- Bump the ?v= token on every deploy so iOS Safari refetches the module
+       graph instead of serving cached copies of changed files. -->
+  <script type="module" src="assets/js/app.js?v=20260630b"></script>
 </body>
 </html>
