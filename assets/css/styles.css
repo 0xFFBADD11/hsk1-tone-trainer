@@ -48,6 +48,10 @@ main {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
+.card { transition: box-shadow 0.2s ease; }
+.card.pass { box-shadow: 0 0 0 3px var(--good), 0 8px 30px rgba(0, 0, 0, 0.35); }
+.card.fail { box-shadow: 0 0 0 3px var(--bad), 0 8px 30px rgba(0, 0, 0, 0.35); }
+
 .hanzi { font-size: 4.5rem; line-height: 1.1; }
 .pinyin { font-size: 1.6rem; color: var(--accent-soft); margin-top: 0.5rem; }
 .english { color: var(--muted); margin-top: 0.4rem; }
@@ -69,7 +73,13 @@ main {
   font-size: 1rem;
   cursor: pointer;
   transition: transform 0.05s ease, background 0.15s ease;
+  /* Stop press-and-hold from selecting the label text, which made some
+     record presses register as misses. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
+.btn.record { touch-action: none; }
 .btn:hover { background: var(--accent-soft); }
 .btn:active { transform: scale(0.97); }
 .btn.ghost { background: transparent; border: 1px solid var(--muted); color: var(--muted); }
@@ -113,6 +123,8 @@ main {
 .feedback.info { color: var(--muted); }
 
 .score { font-size: 1.4rem; font-weight: 600; }
+.pass-badge { font-weight: 600; margin: 0.4rem 0; color: var(--good); }
+.feedback.fail .pass-badge { color: var(--warn); }
 
 .syllables { list-style: none; padding: 0; margin: 0.75rem 0; text-align: left; }
 .syllables li { color: var(--muted); padding: 0.25rem 0; font-size: 0.95rem; }
