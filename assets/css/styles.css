@@ -166,6 +166,26 @@ main {
 .pass-badge { font-weight: 600; margin: 0.35rem 0; color: var(--good); }
 .feedback.fail .pass-badge { color: var(--warn); }
 
+.plots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+.plot-cell { text-align: center; }
+.plot {
+  display: block;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+.plot-label { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+.plot-legend { font-size: 0.75rem; margin: 0.35rem 0 0; }
+.plot-legend span { margin: 0 0.4rem; }
+.leg-you { color: var(--accent-soft); }
+.leg-target { color: var(--good); }
+
 .syllables { list-style: none; padding: 0; margin: 0.6rem 0 0; text-align: left; }
 .syllables li { color: var(--muted); padding: 0.2rem 0; font-size: 0.95rem; }
 .syllables .syl { color: var(--accent-soft); margin-right: 0.5rem; }

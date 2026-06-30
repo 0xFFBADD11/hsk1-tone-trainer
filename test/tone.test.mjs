@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { toSemitones, cleanContour, segment, scoreWord } from '../assets/js/tone.js'
+import { toSemitones, cleanContour, segment, scoreWord, toneTarget, PLOT_N } from '../assets/js/tone.js'
 
 // Build a voiced syllable as an Hz series moving linearly from `fromSt` to
 // `toSt` semitones around a base, so tests exercise the real scorer.
@@ -80,6 +80,22 @@ test('gamma makes scoring more forgiving (<1) or harsher (>1)', () => {
   const harsh = scoreWord(hz, [2], 1.6).overall
   assert.ok(forgiving >= linear, `forgiving ${forgiving} < linear ${linear}`)
   assert.ok(harsh <= linear, `harsh ${harsh} > linear ${linear}`)
+})
+
+test('toneTarget returns canonical shapes of the right length', () => {
+  assert.equal(toneTarget(1).length, PLOT_N)
+  assert.ok(Math.max(...toneTarget(1).map(Math.abs)) < 1e-9) // tone 1 flat
+  const t2 = toneTarget(2)
+  assert.ok(t2[t2.length - 1] > t2[0]) // tone 2 rises
+  const t4 = toneTarget(4)
+  assert.ok(t4[0] > t4[t4.length - 1]) // tone 4 falls
+})
+
+test('scoreWord exposes plot contour and target arrays per syllable', () => {
+  const hz = [...silence(4), ...ramp(4, -4), ...silence(4)]
+  const syl = scoreWord(hz, [4]).syllables[0]
+  assert.equal(syl.contour.length, PLOT_N)
+  assert.equal(syl.target.length, PLOT_N)
 })
 
 test('too-short or empty input yields zero score, not a crash', () => {

@@ -108,6 +108,50 @@ export function segment(cleanHz, count) {
   return segs
 }
 
+// Number of points each plotted contour is resampled to.
+export const PLOT_N = 24
+
+function resampleSeries(series, n) {
+  if (series.length === 0) return new Array(n).fill(0)
+  if (series.length === 1) return new Array(n).fill(series[0])
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const pos = (i / (n - 1)) * (series.length - 1)
+    const lo = Math.floor(pos)
+    const hi = Math.ceil(pos)
+    out.push(series[lo] + (series[hi] - series[lo]) * (pos - lo))
+  }
+  return out
+}
+
+// Canonical pitch shape for a tone as semitone deviations from the syllable
+// mean over `n` points (positive = higher). This is the target contour the
+// learner aims for, mirroring the features the scorer rewards.
+export function toneTarget(tone, n = PLOT_N) {
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1)
+    let dev
+    if (tone === 2) dev = -3 + 6 * t // rising (35)
+    else if (tone === 3) dev = t < 0.4 ? -1 - 10 * t : -5 + (t - 0.4) / 0.6 * 6 // dip (214)
+    else if (tone === 4) dev = 4 - 8 * t // falling (51)
+    else if (tone === 5) dev = 0.5 - t // light neutral
+    else dev = 0 // high-flat (55)
+    out.push(dev)
+  }
+  return out
+}
+
+// The learner's syllable as semitone deviations from its own mean, resampled to
+// `n` points so it can be drawn against a tone target on the same axis.
+export function syllableContour(sylHz, n = PLOT_N) {
+  const voiced = sylHz.filter((f) => Number.isFinite(f) && f > 0)
+  if (voiced.length === 0) return new Array(n).fill(0)
+  const semis = voiced.map(semitone)
+  const m = mean(semis)
+  return resampleSeries(semis.map((s) => s - m), n)
+}
+
 // Score one syllable (voiced Hz) against an expected tone (1-5). floorSt/ceilSt
 // describe the utterance pitch range for the optional height cue, which is only
 // trusted when that range is wide enough to be meaningful.
@@ -176,7 +220,12 @@ export function scoreWord(contourHz, expectedTones, gamma = 1) {
 
   const syllables = expectedTones.map((tone, i) => {
     const r = scoreSyllable(segs[i], tone, floorSt, ceilSt)
-    return { score: clamp01(r.score ** gamma), detected: r.detected }
+    return {
+      score: clamp01(r.score ** gamma),
+      detected: r.detected,
+      contour: syllableContour(segs[i]),
+      target: toneTarget(tone)
+    }
   })
   const overall = mean(syllables.map((s) => s.score))
   return { overall: clamp01(overall), syllables }

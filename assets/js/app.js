@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630i'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630i'
-import { el, clear } from './dom.js?v=20260630i'
-import { speak, speechSupported } from './speech.js?v=20260630i'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630i'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630i'
-import { createQuiz } from './quiz.js?v=20260630i'
+import { HSK1 } from '../data/hsk1.js?v=20260630j'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630j'
+import { el, clear } from './dom.js?v=20260630j'
+import { speak, speechSupported } from './speech.js?v=20260630j'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630j'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630j'
+import { createQuiz } from './quiz.js?v=20260630j'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -14,6 +14,12 @@ const SLOW_RATE = 0.4
 
 // A tone score at or above this percent counts as acceptable ("mastered").
 const ACCEPT_PERCENT = 70
+
+// Pitch-overlay plot size (CSS px) and vertical scale (full height = this many
+// semitones of pitch movement, centered on each contour's mean).
+const PLOT_W = 150
+const PLOT_H = 80
+const PLOT_SPAN_ST = 12
 
 // Selectable strictness. `gamma` shapes the scoring curve (see scoreWord);
 // lower = more forgiving. Native (default) lets a fluent speaker score near
@@ -53,7 +59,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630i · ui-compact'
+const BUILD = '20260630j · pitch-overlay'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -190,6 +196,52 @@ function playSentence(word) {
   speak(ex.hanzi)
 }
 
+function cssVar(name) {
+  return window.getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#fff'
+}
+
+// Draw the target tone shape (dashed) and the learner's contour (solid) on a
+// canvas. Both are semitone deviations from their own mean, so the comparison is
+// about tone shape, not absolute pitch height.
+function drawPlot(canvas, contour, target) {
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = PLOT_W * dpr
+  canvas.height = PLOT_H * dpr
+  canvas.style.width = `${PLOT_W}px`
+  canvas.style.height = `${PLOT_H}px`
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.scale(dpr, dpr)
+
+  const y = (dev) => {
+    const half = PLOT_H / 2
+    const v = Math.max(-1, Math.min(1, dev / (PLOT_SPAN_ST / 2)))
+    return half - v * (half - 6)
+  }
+  const curve = (pts, color, dashed) => {
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    ctx.setLineDash(dashed ? [5, 4] : [])
+    ctx.beginPath()
+    pts.forEach((d, i) => {
+      const x = 2 + (i / (pts.length - 1)) * (PLOT_W - 4)
+      if (i === 0) ctx.moveTo(x, y(d))
+      else ctx.lineTo(x, y(d))
+    })
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(0, PLOT_H / 2)
+  ctx.lineTo(PLOT_W, PLOT_H / 2)
+  ctx.stroke()
+
+  curve(target, cssVar('--good'), true)
+  curve(contour, cssVar('--accent-soft'), false)
+}
+
 // Drive the live mic meter. RMS for speech sits around 0.05–0.2, so a square
 // root scale gives the bar visible travel without saturating immediately.
 function setMeter(level) {
@@ -241,14 +293,33 @@ function showResult(word, result, percent) {
     ])
   )
 
+  // Pitch overlay: target tone shape vs the learner's contour, per syllable.
+  const plots = el('div', { class: 'plots' })
+  const toDraw = []
+  result.syllables.forEach((syl, i) => {
+    if (!syl.contour || !syl.target) return
+    const canvas = el('canvas', { class: 'plot' })
+    plots.append(el('div', { class: 'plot-cell' }, [
+      canvas,
+      el('div', { class: 'plot-label', text: `tone ${word.tones[i]}` })
+    ]))
+    toDraw.push([canvas, syl])
+  })
+
   feedback.append(
     el('div', { class: 'score', text: `${percent}%  ${verdict(percent)}` }),
     el('div', {
       class: 'pass-badge',
       text: passed ? '✓ Acceptable — tone mastered' : '↻ Not quite — try again'
     }),
+    plots,
+    el('p', { class: 'plot-legend' }, [
+      el('span', { class: 'leg-you', text: '— you' }),
+      el('span', { class: 'leg-target', text: '┄ target' })
+    ]),
     el('ul', { class: 'syllables' }, rows)
   )
+  for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 }
 
 function setFeedback(message, kind) {
