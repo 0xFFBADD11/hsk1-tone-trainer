@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630k'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630k'
-import { el, clear } from './dom.js?v=20260630k'
-import { speak, speechSupported } from './speech.js?v=20260630k'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630k'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630k'
-import { createQuiz } from './quiz.js?v=20260630k'
+import { HSK1 } from '../data/hsk1.js?v=20260630l'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630l'
+import { el, clear } from './dom.js?v=20260630l'
+import { speak, speechSupported } from './speech.js?v=20260630l'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630l'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630l'
+import { createQuiz } from './quiz.js?v=20260630l'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -59,7 +59,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630k · button-layout'
+const BUILD = '20260630l · score-matches-plot'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -106,11 +106,12 @@ function renderWord() {
   const { position, total } = quiz.progress()
 
   clear(app)
-  const progressText = `Word ${position} of ${total}` +
-    (mastered.size ? ` · ✓ ${mastered.size} mastered` : '')
   app.append(
     el('div', { class: 'topbar' }, [
-      el('p', { class: 'progress', text: progressText })
+      el('span', { class: 'progress-count', text: `Word ${position} / ${total}` }),
+      mastered.size
+        ? el('span', { class: 'mastered-badge', text: `✓ ${mastered.size} mastered` })
+        : null
     ]),
     el('div', { class: 'practice-grid' }, [
       el('div', { class: 'card', id: 'word-card' }, [

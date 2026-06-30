@@ -1,20 +1,16 @@
-// Tone scoring. Mandarin tones are pitch shapes over a syllable, defined mainly
-// by direction and, secondarily, by height in the speaker's range:
+// Tone scoring. Mandarin tones are pitch shapes over a syllable:
 //   1 high-level, 2 rising, 3 low-dipping, 4 falling, 5 neutral.
 // We clean the raw F0 track (octave-correct + smooth), split it into syllables
-// by voiced runs, and score each syllable's slope/curvature in semitones — which
-// is independent of the speaker's absolute pitch — with a light height cue when
-// the utterance shows a usable pitch range. Everything here is pure so it can be
-// unit-tested and fuzzed without audio hardware.
+// by voiced runs, and score each syllable by how closely its pitch contour
+// matches the canonical tone target — the same shape drawn in the comparison
+// plot, so the score and the picture always agree. Everything here is pure so it
+// can be unit-tested and fuzzed without audio hardware.
 
 const MIN_VOICED = 3
-// Semitone references for full credit, tuned to typical tone excursions.
-const RISE_FALL_ST = 4
-const FLAT_RANGE_ST = 3
-const DIP_ST = 2
-// Utterance pitch range (semitones) above which absolute height is a reliable
-// cue; below it (e.g. one flat syllable) we score on shape alone.
-const USABLE_RANGE_ST = 5
+// Average semitone gap between the learner's contour and the target at which the
+// match score reaches 0 (smaller = stricter). The score is 1 minus the
+// normalized RMS distance, so it tracks how close the two plotted curves look.
+const SIM_TOL_ST = 3
 
 // Convert a frequency series (Hz) to a semitone series relative to its own
 // median, dropping non-positive/non-finite samples. Retained for callers and
@@ -70,12 +66,6 @@ function semitone(hz) {
 
 function mean(a) {
   return a.reduce((s, v) => s + v, 0) / a.length
-}
-
-function percentile(sortedAsc, p) {
-  if (sortedAsc.length === 0) return 0
-  const i = Math.min(sortedAsc.length - 1, Math.max(0, Math.round(p * (sortedAsc.length - 1))))
-  return sortedAsc[i]
 }
 
 // Split a cleaned contour into `count` syllables: prefer contiguous voiced runs
@@ -139,7 +129,10 @@ export function toneTarget(tone, n = PLOT_N) {
     else dev = 0 // high-flat (55)
     out.push(dev)
   }
-  return out
+  // Center on the mean so the target and the learner's contour (also mean-zero)
+  // are compared on the same axis — keeps the score and the plot consistent.
+  const m = out.reduce((s, v) => s + v, 0) / out.length
+  return out.map((v) => v - m)
 }
 
 // The learner's syllable as semitone deviations from its own mean, resampled to
@@ -152,55 +145,35 @@ export function syllableContour(sylHz, n = PLOT_N) {
   return resampleSeries(semis.map((s) => s - m), n)
 }
 
-// Score one syllable (voiced Hz) against an expected tone (1-5). floorSt/ceilSt
-// describe the utterance pitch range for the optional height cue, which is only
-// trusted when that range is wide enough to be meaningful.
-export function scoreSyllable(sylHz, expectedTone, floorSt = 0, ceilSt = 0) {
+// Similarity (0..1) of a learner contour to a tone target, both as semitone
+// deviations from their own mean: 1 minus their RMS gap, normalized by
+// SIM_TOL_ST. This is the distance between the two curves drawn in the
+// comparison plot, so the score matches the picture — and it is magnitude-aware,
+// so a barely-moving contour does not match a strong rise/fall.
+function toneSimilarity(user, target) {
+  const n = Math.min(user.length, target.length)
+  let sum = 0
+  for (let i = 0; i < n; i++) {
+    const d = user[i] - target[i]
+    sum += d * d
+  }
+  const rms = Math.sqrt(sum / n)
+  return clamp01(1 - rms / SIM_TOL_ST)
+}
+
+// Score one syllable (voiced Hz) against an expected tone (1-5) by comparing its
+// pitch contour to the canonical tone targets — the same shapes drawn in the
+// comparison plot. `detected` is whichever target it matches best.
+export function scoreSyllable(sylHz, expectedTone) {
   const voiced = sylHz.filter((f) => Number.isFinite(f) && f > 0)
   if (voiced.length < MIN_VOICED) return { score: 0, detected: 0 }
-  const semis = voiced.map(semitone)
-  const n = semis.length
+  const user = syllableContour(sylHz)
 
-  let lo = semis[0]
-  let hi = semis[0]
-  let minPos = 0
-  for (let i = 0; i < n; i++) {
-    if (semis[i] < lo) {
-      lo = semis[i]
-      minPos = i
-    }
-    if (semis[i] > hi) hi = semis[i]
-  }
-  const head = Math.max(1, Math.round(n * 0.25))
-  const tail = Math.max(1, Math.round(n * 0.25))
-  const onset = mean(semis.slice(0, head))
-  const offset = mean(semis.slice(n - tail))
-  const range = hi - lo
-  const slope = offset - onset
-  const inside = minPos >= head && minPos < n - tail
-  const dipDepth = inside ? Math.min(onset, offset) - lo : 0
-
-  // Shape scores (independent of absolute pitch).
-  const flat = clamp01(1 - range / FLAT_RANGE_ST)
-  const scores = {
-    1: flat,
-    2: clamp01(slope / RISE_FALL_ST),
-    3: clamp01(dipDepth / DIP_ST),
-    4: clamp01(-slope / RISE_FALL_ST),
-    5: flat * 0.8
-  }
-
-  // Height cue: with a usable range, tone 1 sits high and tone 3 sits low.
-  const span = ceilSt - floorSt
-  if (span >= USABLE_RANGE_ST) {
-    const level = clamp01((mean(semis) - floorSt) / span)
-    scores[1] *= 0.5 + 0.5 * level
-    scores[3] = Math.max(scores[3], clamp01((0.5 - level) / 0.5))
-  }
-
+  const sims = {}
+  for (const t of [1, 2, 3, 4, 5]) sims[t] = toneSimilarity(user, toneTarget(t))
   let detected = 1
-  for (const t of [2, 3, 4, 5]) if (scores[t] > scores[detected]) detected = t
-  return { score: clamp01(scores[expectedTone] ?? 0), detected }
+  for (const t of [2, 3, 4, 5]) if (sims[t] > sims[detected]) detected = t
+  return { score: clamp01(sims[expectedTone] ?? 0), detected }
 }
 
 // Score a whole-word F0 contour (Hz, 0 for unvoiced frames) against the expected
@@ -214,12 +187,8 @@ export function scoreWord(contourHz, expectedTones, gamma = 1) {
   if (segs.length !== count) {
     return { overall: 0, syllables: expectedTones.map(() => ({ score: 0, detected: 0 })) }
   }
-  const allSemis = clean.filter((f) => f > 0).map(semitone).sort((a, b) => a - b)
-  const floorSt = percentile(allSemis, 0.1)
-  const ceilSt = percentile(allSemis, 0.9)
-
   const syllables = expectedTones.map((tone, i) => {
-    const r = scoreSyllable(segs[i], tone, floorSt, ceilSt)
+    const r = scoreSyllable(segs[i], tone)
     return {
       score: clamp01(r.score ** gamma),
       detected: r.detected,
