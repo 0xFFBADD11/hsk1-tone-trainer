@@ -1,4 +1,4 @@
-// Flat ESLint config enforcing the strongentropy house style and the
+// Flat ESLint config enforcing the project house style and the
 // security bans (no eval, no implied eval). Browser globals cover the
 // front end; Node globals cover tests and tooling.
 const browserGlobals = {

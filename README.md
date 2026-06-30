@@ -68,7 +68,6 @@ fuzz/                   jazzer.js fuzz target
 
 ## Standards
 
-Built following the [strongentropy](https://github.com/strongentropy/strongentropy.github.io)
-practices: 2-space indent, single quotes, no semicolons, no dead code, no
+2-space indent, single quotes, no semicolons, no dead code, no
 `eval`/`innerHTML`, input validated at trust boundaries, Conventional Commits,
 and the CI/security controls listed in `SECURITY.md`.
