@@ -1,7 +1,7 @@
 import { HSK1 } from '../data/hsk1.js'
 import { el, clear } from './dom.js'
 import { speak, speechSupported } from './speech.js'
-import { recordPitchContour, microphoneSupported } from './pitch.js'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js'
 import { toSemitones, scoreWord, TONE_NAMES } from './tone.js'
 import { createQuiz } from './quiz.js'
 
@@ -36,6 +36,9 @@ function renderWord() {
       el('button', { class: 'btn', text: '🔊 Listen', onclick: () => speak(word.hanzi) }),
       el('button', { class: 'btn record', text: '🎤 Hold to record', id: 'record-btn' })
     ]),
+    el('div', { class: 'meter', id: 'meter' }, [
+      el('div', { class: 'meter-bar', id: 'meter-bar' })
+    ]),
     el('div', { class: 'feedback', id: 'feedback' }),
     el('div', { class: 'controls' }, [
       el('button', { class: 'btn ghost', text: 'Skip →', onclick: () => advance(0) })
@@ -50,13 +53,17 @@ function wireRecordButton(word) {
   async function start(ev) {
     ev.preventDefault()
     if (recorder) return
+    // Must run synchronously inside the gesture, before any await, or iOS
+    // Safari refuses to start the audio context.
+    primeAudio()
     setFeedback('Recording… release to score', 'info')
     btn.classList.add('active')
     try {
-      recorder = await recordPitchContour()
+      recorder = await recordPitchContour(setMeter)
     } catch {
       recorder = null
       btn.classList.remove('active')
+      setMeter(0)
       setFeedback('Microphone access was denied.', 'error')
     }
   }
@@ -64,9 +71,10 @@ function wireRecordButton(word) {
   async function stop() {
     if (!recorder) return
     btn.classList.remove('active')
-    const contour = await recorder.stop()
+    const capture = await recorder.stop()
     recorder = null
-    evaluate(word, contour)
+    setMeter(0)
+    evaluate(word, capture)
   }
 
   btn.addEventListener('mousedown', start)
@@ -76,10 +84,24 @@ function wireRecordButton(word) {
   btn.addEventListener('touchend', stop)
 }
 
-function evaluate(word, contour) {
+// Drive the live mic meter. RMS for speech sits around 0.05–0.2, so a square
+// root scale gives the bar visible travel without saturating immediately.
+function setMeter(level) {
+  const bar = document.getElementById('meter-bar')
+  if (!bar) return
+  const pct = Math.min(100, Math.round(Math.sqrt(level) * 140))
+  bar.style.width = `${pct}%`
+}
+
+function evaluate(word, capture) {
+  const { contour, frames, voiced, peak } = capture
   const semitones = toSemitones(contour)
   if (semitones.length < word.tones.length * 2) {
-    setFeedback('Too quiet or too short — try speaking the whole word.', 'error')
+    setFeedback(
+      'Too quiet or too short — try speaking the whole word. ' +
+        `(frames ${frames}, peak ${peak.toFixed(3)}, voiced ${voiced})`,
+      'error'
+    )
     return
   }
   const result = scoreWord(semitones, word.tones)
