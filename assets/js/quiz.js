@@ -30,6 +30,10 @@ export function createQuiz(words, rand = Math.random) {
       scores.push({ word: order[index], score })
       index += 1
     },
+    // Advance without recording a score (the word was not attempted).
+    skip() {
+      index += 1
+    },
     isDone() {
       return index >= order.length
     },

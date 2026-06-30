@@ -1,19 +1,19 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630c'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630c'
-import { el, clear } from './dom.js?v=20260630c'
-import { speak, speechSupported } from './speech.js?v=20260630c'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630c'
-import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630c'
-import { createQuiz } from './quiz.js?v=20260630c'
+import { HSK1 } from '../data/hsk1.js?v=20260630d'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630d'
+import { el, clear } from './dom.js?v=20260630d'
+import { speak, speechSupported } from './speech.js?v=20260630d'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630d'
+import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630d'
+import { createQuiz } from './quiz.js?v=20260630d'
 
 // Slow playback rate for the Slow button; speak()'s default (0.85) is normal.
 const SLOW_RATE = 0.5
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630c · play-options'
+const BUILD = '20260630d · autoplay-next'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -58,10 +58,13 @@ function renderWord() {
     el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),
     el('div', { class: 'controls' }, [
-      el('button', { class: 'btn ghost', text: 'Skip →', onclick: () => advance(0) })
+      el('button', { class: 'btn ghost', text: 'Next →', onclick: () => skipWord() })
     ])
   )
   wireRecordButton(word)
+  // Play the word automatically when it appears (after the first user gesture;
+  // browsers may suppress the very first utterance until the page is tapped).
+  speak(word.hanzi)
 }
 
 function wireRecordButton(word) {
@@ -172,6 +175,14 @@ function setFeedback(message, kind) {
   clear(feedback)
   feedback.className = `feedback shown ${kind}`
   feedback.append(el('p', { text: message }))
+}
+
+// Move to the next word without recording a score (an unattempted word should
+// not count against the session average).
+function skipWord() {
+  quiz.skip()
+  if (quiz.isDone()) renderSummary()
+  else renderWord()
 }
 
 function advance(score) {
