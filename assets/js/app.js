@@ -1,15 +1,19 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630b'
-import { el, clear } from './dom.js?v=20260630b'
-import { speak, speechSupported } from './speech.js?v=20260630b'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630b'
-import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630b'
-import { createQuiz } from './quiz.js?v=20260630b'
+import { HSK1 } from '../data/hsk1.js?v=20260630c'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630c'
+import { el, clear } from './dom.js?v=20260630c'
+import { speak, speechSupported } from './speech.js?v=20260630c'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630c'
+import { toSemitones, scoreWord, TONE_NAMES } from './tone.js?v=20260630c'
+import { createQuiz } from './quiz.js?v=20260630c'
+
+// Slow playback rate for the Slow button; speak()'s default (0.85) is normal.
+const SLOW_RATE = 0.5
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630b · mic-fix'
+const BUILD = '20260630c · play-options'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -41,12 +45,17 @@ function renderWord() {
       el('div', { class: 'english', text: word.en })
     ]),
     el('div', { class: 'controls' }, [
-      el('button', { class: 'btn', text: '🔊 Listen', onclick: () => speak(word.hanzi) }),
+      el('button', { class: 'btn', text: '▶️ Play', onclick: () => speak(word.hanzi) }),
+      el('button', { class: 'btn ghost', text: '🐢 Slow', onclick: () => speak(word.hanzi, SLOW_RATE) }),
+      el('button', { class: 'btn ghost', text: '💬 Sentence', onclick: () => playSentence(word) })
+    ]),
+    el('div', { class: 'controls' }, [
       el('button', { class: 'btn record', text: '🎤 Hold to record', id: 'record-btn' })
     ]),
     el('div', { class: 'meter', id: 'meter' }, [
       el('div', { class: 'meter-bar', id: 'meter-bar' })
     ]),
+    el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),
     el('div', { class: 'controls' }, [
       el('button', { class: 'btn ghost', text: 'Skip →', onclick: () => advance(0) })
@@ -90,6 +99,25 @@ function wireRecordButton(word) {
   btn.addEventListener('mouseup', stop)
   btn.addEventListener('mouseleave', stop)
   btn.addEventListener('touchend', stop)
+}
+
+// Show the example sentence for a word (hanzi + pinyin + English) and speak it.
+function playSentence(word) {
+  const box = document.getElementById('example')
+  if (!box) return
+  clear(box)
+  box.className = 'example shown'
+  const ex = HSK1_EXAMPLES[word.hanzi]
+  if (!ex) {
+    box.append(el('p', { class: 'ex-en', text: 'No example sentence for this word yet.' }))
+    return
+  }
+  box.append(
+    el('div', { class: 'ex-hanzi', text: ex.hanzi }),
+    el('div', { class: 'ex-pinyin', text: ex.pinyin }),
+    el('div', { class: 'ex-en', text: ex.en })
+  )
+  speak(ex.hanzi)
 }
 
 // Drive the live mic meter. RMS for speech sits around 0.05–0.2, so a square

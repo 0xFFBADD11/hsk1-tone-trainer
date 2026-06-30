@@ -12,15 +12,16 @@ function pickChineseVoice() {
     null
 }
 
-// Speak `text` in Mandarin. Voices can load asynchronously, so retry once
-// after the voiceschanged event if none are ready yet.
-export function speak(text) {
+// Speak `text` in Mandarin at `rate` (1 = normal; lower is slower). Voices can
+// load asynchronously, so retry once after the voiceschanged event if none are
+// ready yet.
+export function speak(text, rate = 0.85) {
   if (!speechSupported()) return
   window.speechSynthesis.cancel()
 
   const utter = new SpeechSynthesisUtterance(text)
   utter.lang = 'zh-CN'
-  utter.rate = 0.85
+  utter.rate = rate
 
   const voice = pickChineseVoice()
   if (voice) {
