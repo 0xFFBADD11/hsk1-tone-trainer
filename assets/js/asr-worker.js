@@ -35,7 +35,10 @@ self.onmessage = async (e) => {
         return_timestamps: false,
         max_new_tokens: 48,
         no_repeat_ngram_size: 3,
-        repetition_penalty: 1.5
+        repetition_penalty: 1.5,
+        // Beam search yields cleaner Chinese output (fewer Latin/garbled results
+        // for real Chinese speech) than greedy decoding.
+        num_beams: 3
       })
       self.postMessage({ type: 'result', text: (out && out.text) || '' })
     }
