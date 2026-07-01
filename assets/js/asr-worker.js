@@ -27,10 +27,15 @@ self.onmessage = async (e) => {
       }
       self.postMessage({ type: 'ready' })
     } else if (msg.type === 'transcribe') {
+      // Cap output length and penalize repetition so a bad clip can't spiral
+      // into a huge repeated generation (the "射射射…" runaway) that eats memory.
       const out = await transcriber(msg.audio, {
         language: 'chinese',
         task: 'transcribe',
-        return_timestamps: false
+        return_timestamps: false,
+        max_new_tokens: 48,
+        no_repeat_ngram_size: 3,
+        repetition_penalty: 1.5
       })
       self.postMessage({ type: 'result', text: (out && out.text) || '' })
     }

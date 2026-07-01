@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631j'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631j'
-import { el, clear } from './dom.js?v=20260631j'
-import { speak, speechSupported } from './speech.js?v=20260631j'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631j'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631j'
-import { createQuiz } from './quiz.js?v=20260631j'
-import { toWhisperInput } from './audio.js?v=20260631j'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631j'
+import { HSK1 } from '../data/hsk1.js?v=20260631k'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631k'
+import { el, clear } from './dom.js?v=20260631k'
+import { speak, speechSupported } from './speech.js?v=20260631k'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631k'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631k'
+import { createQuiz } from './quiz.js?v=20260631k'
+import { toWhisperInput } from './audio.js?v=20260631k'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631k'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631j · 3-sentences-slow-first'
+const BUILD = '20260631k · perf-shuffle-checking'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -378,12 +378,37 @@ function showBest(best) {
   box.append(el('p', { class: 'best-note', text: `Best so far: ${pct}%  ${verdict(pct)}` }))
 }
 
-// Pick a random example sentence for a word (data may be one object or an array).
-function pickExample(word) {
+// The example sentence currently shown (so the shuffle button and the sentence
+// record/play can use it without rebuilding their listeners).
+let currentExample = null
+
+// Pick a random example sentence for a word (data may be one object or an
+// array), optionally avoiding the current one.
+function pickExample(word, avoid) {
   const ex = HSK1_EXAMPLES[word.hanzi]
   if (!ex) return null
   const list = Array.isArray(ex) ? ex : [ex]
-  return list[Math.floor(Math.random() * list.length)]
+  if (list.length === 1) return list[0]
+  let pick = list[Math.floor(Math.random() * list.length)]
+  while (avoid && pick === avoid) pick = list[Math.floor(Math.random() * list.length)]
+  return pick
+}
+
+// Swap to a different random example sentence in place.
+function newSentence(word) {
+  const next = pickExample(word, currentExample)
+  if (!next) return
+  currentExample = next
+  const py = document.getElementById('ex-pinyin')
+  if (py) py.textContent = next.pinyin
+  const en = document.getElementById('ex-en')
+  if (en) en.textContent = next.en
+  fillSentenceHanzi(word)
+  const pron = document.getElementById('pron-result')
+  if (pron) {
+    clear(pron)
+    pron.className = 'score-panel'
+  }
 }
 
 // A play (▶️) + hold-to-record (🎤) control pair for a panel.
@@ -403,7 +428,10 @@ function playRecordControls(playLabel, onPlay, recordId, recordLabel) {
 function renderWord() {
   const word = quiz.current()
   if (!word) return renderSummary()
-  const ex = pickExample(word)
+  currentExample = pickExample(word)
+  const ex = currentExample
+  const pool = HSK1_EXAMPLES[word.hanzi]
+  const canShuffle = Array.isArray(pool) && pool.length > 1
 
   clear(app)
   const backAttrs = { class: 'btn ghost', text: '← Back', onclick: () => prevWord() }
@@ -423,10 +451,13 @@ function renderWord() {
   ])
 
   const sentenceCard = el('div', { class: 'card panel sentence' }, [
+    canShuffle
+      ? el('button', { class: 'shuffle', title: 'Another sentence', 'aria-label': 'Another sentence', text: '↻', onclick: () => newSentence(word) })
+      : null,
     el('div', { class: 'ex-hanzi', id: 'ex-hanzi' }),
-    el('div', { class: 'ex-pinyin', text: ex ? ex.pinyin : '' }),
-    el('div', { class: 'ex-en', text: ex ? ex.en : 'No example sentence yet.' }),
-    ex ? playRecordControls('Play sentence', () => say(ex.hanzi), 'sentence-record-btn', 'Hold to read the sentence') : null,
+    el('div', { class: 'ex-pinyin', id: 'ex-pinyin', text: ex ? ex.pinyin : '' }),
+    el('div', { class: 'ex-en', id: 'ex-en', text: ex ? ex.en : 'No example sentence yet.' }),
+    ex ? playRecordControls('Play sentence', () => currentExample && say(currentExample.hanzi), 'sentence-record-btn', 'Hold to read the sentence') : null,
     el('div', { class: 'meter' }, [el('div', { class: 'meter-bar', id: 'sentence-meter-bar' })])
   ])
 
@@ -450,8 +481,8 @@ function renderWord() {
   fillWordList(document.getElementById('wordlist'))
   wireRecordButton(word)
   if (ex) {
-    fillSentenceHanzi(ex, word)
-    wireSentenceRecord(word, ex)
+    fillSentenceHanzi(word)
+    wireSentenceRecord(word)
   }
 
   const best = quiz.scoreAt(quiz.currentIndex())
@@ -462,12 +493,12 @@ function renderWord() {
 }
 
 // Fill the sentence hanzi row with clickable words (target word bold).
-async function fillSentenceHanzi(ex, word) {
+async function fillSentenceHanzi(word) {
   const row = document.getElementById('ex-hanzi')
-  if (!row) return
+  if (!row || !currentExample) return
   await ensurePinyin()
   clear(row)
-  for (const span of speakableSpans(ex.hanzi, word.hanzi)) row.append(span)
+  for (const span of speakableSpans(currentExample.hanzi, word.hanzi)) row.append(span)
 }
 
 function wireRecordButton(word) {
@@ -527,7 +558,7 @@ function wireRecordButton(word) {
 }
 
 // Hold-to-record the sentence reading, then rate the target word from it.
-function wireSentenceRecord(word, ex) {
+function wireSentenceRecord(word) {
   const btn = document.getElementById('sentence-record-btn')
   if (!btn) return
   let pressActive = false
@@ -570,7 +601,7 @@ function wireSentenceRecord(word, ex) {
     const capture = await sentRec.stop()
     sentRec = null
     setMeter(0, 'sentence-meter-bar')
-    scoreSentence(word, ex, capture)
+    scoreSentence(word, currentExample, capture)
   }
 
   btn.addEventListener('pointerdown', start)
@@ -721,6 +752,21 @@ function setSentencePron(text) {
   box.append(el('p', { class: 'best-note', text }))
 }
 
+// "Checking…" with an indeterminate progress bar so the wait is visible.
+function setSentenceChecking() {
+  const box = document.getElementById('pron-result')
+  if (!box) return
+  clear(box)
+  box.className = 'score-panel shown'
+  box.append(
+    el('p', { class: 'best-note', text: 'Checking pronunciation…' }),
+    el('div', { class: 'checking-bar' }, [el('div', { class: 'checking-fill' })])
+  )
+}
+
+// Longest audio (seconds) sent to the recognizer; guards memory/runaway.
+const MAX_PRON_SECONDS = 12
+
 // Transcribe a full-sentence reading and rate just the target word within it,
 // by finding the best-matching syllable window. Whisper is far more reliable on
 // a sentence than on a lone syllable, so this rates the target more fairly.
@@ -729,8 +775,9 @@ function scoreSentence(word, ex, capture) {
     setSentencePron('No audio captured — try again.')
     return
   }
-  setSentencePron('Checking pronunciation…')
-  const pcm = toWhisperInput(capture.audio, capture.sampleRate)
+  setSentenceChecking()
+  let pcm = toWhisperInput(capture.audio, capture.sampleRate)
+  if (pcm.length > 16000 * MAX_PRON_SECONDS) pcm = pcm.slice(0, 16000 * MAX_PRON_SECONDS)
   const durSec = (pcm.length / 16000).toFixed(1)
   transcribe(pcm).then(async (text) => {
     const heard = cleanHeard(text)

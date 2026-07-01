@@ -201,6 +201,43 @@ main {
   border-radius: 12px;
   padding: 0.75rem;
 }
+.card.sentence { position: relative; }
+/* Inconspicuous "another sentence" button in the sentence panel corner. */
+.shuffle {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.55;
+  padding: 0.2rem;
+  line-height: 1;
+}
+.shuffle:hover { opacity: 1; color: var(--accent-soft); }
+
+/* Indeterminate progress bar shown while a pronunciation check runs. */
+.checking-bar {
+  height: 4px;
+  margin-top: 0.5rem;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.checking-fill {
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  border-radius: 3px;
+  animation: checking 1.1s ease-in-out infinite;
+}
+@keyframes checking {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
 .ex-hanzi { font-size: 1.5rem; line-height: 1.3; }
 .ex-word { cursor: pointer; border-radius: 4px; padding: 0 1px; }
 .ex-word:hover { color: var(--accent-soft); background: rgba(255, 255, 255, 0.08); }
