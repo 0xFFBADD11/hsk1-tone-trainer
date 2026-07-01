@@ -28,14 +28,10 @@ self.onmessage = async (e) => {
       }
       self.postMessage({ type: 'ready' })
     } else if (msg.type === 'transcribe') {
-      // Greedy, no timestamps, and no-repeat to curb tiny-Whisper's tendency to
-      // hallucinate a common phrase (好/你好/谢谢) on short single-syllable clips.
       const out = await transcriber(msg.audio, {
         language: 'chinese',
         task: 'transcribe',
-        return_timestamps: false,
-        no_repeat_ngram_size: 3,
-        temperature: 0
+        return_timestamps: false
       })
       self.postMessage({ type: 'result', text: (out && out.text) || '' })
     }

@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630s'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630s'
-import { el, clear } from './dom.js?v=20260630s'
-import { speak, speechSupported } from './speech.js?v=20260630s'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630s'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630s'
-import { createQuiz } from './quiz.js?v=20260630s'
-import { toWhisperInput } from './audio.js?v=20260630s'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, pronunciationCloseness } from './pronounce.js?v=20260630s'
+import { HSK1 } from '../data/hsk1.js?v=20260630t'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630t'
+import { el, clear } from './dom.js?v=20260630t'
+import { speak, speechSupported } from './speech.js?v=20260630t'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630t'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630t'
+import { createQuiz } from './quiz.js?v=20260630t'
+import { toWhisperInput } from './audio.js?v=20260630t'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, pronunciationCloseness } from './pronounce.js?v=20260630t'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630s · whisper-base'
+const BUILD = '20260630t · pron-diagnostics'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -522,11 +522,12 @@ function checkPronunciation(word, result, tonePercent, capture) {
   if (!pronounceEnabled || !pronounceReady()) return
   if (!capture.audio || capture.audio.length === 0) return
   const pcm = toWhisperInput(capture.audio, capture.sampleRate)
+  const debug = `audio ${(pcm.length / 16000).toFixed(1)}s @ ${capture.sampleRate}Hz`
   transcribe(pcm).then(async (text) => {
     const heard = cleanHeard(text)
     const heardPinyin = await toPinyin(heard)
     const closeness = pronunciationCloseness(word.pinyin, heardPinyin)
-    renderPronResult(word, heard, heardPinyin, closeness)
+    renderPronResult(word, heard, heardPinyin, closeness, `${debug} · raw “${text || '—'}”`)
     const passed = tonePercent >= ACCEPT_PERCENT && closeness >= PRON_ACCEPT
     quiz.setScore(result.overall * closeness)
     if (passed) mastered.add(word.hanzi)
@@ -567,7 +568,7 @@ function hanziSpeakSpan(hanzi, pinyin, en) {
 }
 
 // Render the pronunciation section to match the tone section's style.
-function renderPronResult(word, heard, heardPinyin, closeness) {
+function renderPronResult(word, heard, heardPinyin, closeness, debug) {
   const pr = document.getElementById('pron-result')
   if (!pr) return
   clear(pr)
@@ -586,6 +587,7 @@ function renderPronResult(word, heard, heardPinyin, closeness) {
       ])
     ])
   )
+  if (debug) pr.append(el('p', { class: 'best-note', text: debug }))
 }
 
 function setFeedback(message, kind) {
