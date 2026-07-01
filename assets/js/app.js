@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631f'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631f'
-import { el, clear } from './dom.js?v=20260631f'
-import { speak, speechSupported } from './speech.js?v=20260631f'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631f'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631f'
-import { createQuiz } from './quiz.js?v=20260631f'
-import { toWhisperInput } from './audio.js?v=20260631f'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631f'
+import { HSK1 } from '../data/hsk1.js?v=20260631g'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631g'
+import { el, clear } from './dom.js?v=20260631g'
+import { speak, speechSupported } from './speech.js?v=20260631g'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631g'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631g'
+import { createQuiz } from './quiz.js?v=20260631g'
+import { toWhisperInput } from './audio.js?v=20260631g'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631g'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -16,6 +16,9 @@ const SLOW_RATE = 0.3
 
 // A tone score at or above this percent counts as acceptable ("mastered").
 const ACCEPT_PERCENT = 70
+
+// Shown when the mic is blocked (e.g. accidentally denied) — how to re-enable.
+const MIC_HELP = 'Mic blocked. On iPhone: tap “aA” in the address bar → Website Settings → Microphone → Allow, then reload.'
 
 // Pronunciation closeness (0..1) bands: at/above ACCEPT is correct, above NEAR
 // is a near miss, below is a different word.
@@ -66,7 +69,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631f · heard-wrong-red'
+const BUILD = '20260631g · diag-in-footer'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -439,7 +442,7 @@ function wireRecordButton(word) {
       recorder = null
       btn.classList.remove('active')
       setMeter(0)
-      setFeedback('Microphone access was denied.', 'error')
+      setFeedback(MIC_HELP, 'error')
     }
   }
 
@@ -528,7 +531,7 @@ function wireSentenceRecord(word) {
       sentRec = null
       btn.classList.remove('active')
       setMeter(0)
-      setSentencePron('Microphone access was denied.')
+      setSentencePron(MIC_HELP)
     }
   }
 
@@ -708,7 +711,9 @@ function scoreSentence(word, capture) {
     const best = bestWindowCloseness(pyArr.map(tonelessPinyin), word.pinyin, word.tones.length)
     const matchedHanzi = heardChars.slice(best.start, best.start + best.length).join('')
     const matchedPinyin = pyArr.slice(best.start, best.start + best.length).join('')
-    renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin, `audio ${durSec}s · raw “${text || '—'}”`)
+    renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin)
+    // Diagnostics go in the subtle footer status line, not the result box.
+    setPronStatus(`audio ${durSec}s · raw “${text || '—'}”`)
   }).catch((e) => setSentencePron(`Pronunciation check failed: ${e.message}`))
 }
 
@@ -722,7 +727,7 @@ function expectedChars(word) {
 // Render the target word's pronunciation rating from the sentence reading. When
 // the target wasn't clearly found, also show the closest word actually heard,
 // with hanzi + pinyin.
-function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin, debug) {
+function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin) {
   const box = document.getElementById('sentence-pron')
   if (!box) return
   clear(box)
@@ -749,8 +754,7 @@ function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin, debu
     el('p', { class: 'best-note' }, [
       el('span', { text: 'heard sentence: ' }),
       ...(heard ? heardSpans(heard, best.start, best.length, expectedChars(word)) : [el('span', { text: '—' })])
-    ]),
-    el('p', { class: 'best-note', text: debug })
+    ])
   )
   box.append(...rows)
 }
