@@ -12,27 +12,34 @@ function pickChineseVoice() {
     null
 }
 
-// Speak `text` in Mandarin at `rate` (1 = normal; lower is slower). Voices can
-// load asynchronously, so retry once after the voiceschanged event if none are
-// ready yet.
-export function speak(text, rate = 0.85) {
-  if (!speechSupported()) return
-  window.speechSynthesis.cancel()
-
+function utterAndSpeak(text, rate) {
+  const synth = window.speechSynthesis
   const utter = new SpeechSynthesisUtterance(text)
   utter.lang = 'zh-CN'
   utter.rate = rate
-
   const voice = pickChineseVoice()
-  if (voice) {
-    utter.voice = voice
-    window.speechSynthesis.speak(utter)
+  if (voice) utter.voice = voice
+  synth.speak(utter)
+  // Chrome sometimes leaves the synthesizer paused after cancel()/on load, so
+  // the utterance queues but never plays; resume() kicks it off.
+  synth.resume()
+}
+
+// Speak `text` in Mandarin at `rate` (1 = normal; lower is slower). If no voice
+// list is available yet, wait once for `voiceschanged`; otherwise speak now,
+// falling back to the browser's default zh-CN voice when no Chinese voice is
+// installed.
+export function speak(text, rate = 0.85) {
+  if (!speechSupported()) return
+  const synth = window.speechSynthesis
+  synth.cancel()
+
+  if (synth.getVoices().length > 0) {
+    utterAndSpeak(text, rate)
     return
   }
-  window.speechSynthesis.addEventListener('voiceschanged', function once() {
-    window.speechSynthesis.removeEventListener('voiceschanged', once)
-    const ready = pickChineseVoice()
-    if (ready) utter.voice = ready
-    window.speechSynthesis.speak(utter)
+  synth.addEventListener('voiceschanged', function once() {
+    synth.removeEventListener('voiceschanged', once)
+    utterAndSpeak(text, rate)
   })
 }
