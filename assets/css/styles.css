@@ -83,6 +83,20 @@ main {
 }
 .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+/* Pronunciation toggle + status, sits below the strictness selector. */
+.pron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+.pron-status { color: var(--muted); font-size: 0.75rem; }
+.pron-line { margin: 0.3rem 0 0; }
+.pron-line.good { color: var(--good); }
+.pron-line.bad { color: var(--warn); }
+
 .card {
   background: var(--panel);
   border-radius: 16px;
