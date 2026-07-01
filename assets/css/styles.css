@@ -116,6 +116,7 @@ main {
 .card.fail { box-shadow: 0 0 0 3px var(--bad), 0 8px 30px rgba(0, 0, 0, 0.35); }
 
 .hanzi { font-size: 4.5rem; line-height: 1.1; }
+.hanzi.word-speak { cursor: pointer; }
 .pinyin { font-size: 1.6rem; color: var(--accent-soft); margin-top: 0.4rem; }
 .english { color: var(--muted); margin-top: 0.3rem; font-size: 1rem; }
 
