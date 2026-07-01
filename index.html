@@ -6,11 +6,10 @@
   <!-- CSP fallback for static hosts (e.g. GitHub Pages) that cannot set
        response headers; mirrors the Cloudflare Worker policy where meta
        directives are honored.
-       NOTE: relaxed to load Transformers.js + ONNX Runtime WASM from jsDelivr and
-       the whisper-small model from Hugging Face (too large to bundle within
-       GitHub's 100 MB file limit). Audio is never uploaded — only the model and
-       library are fetched. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co; base-uri 'none'; object-src 'none'">
+       NOTE: relaxed to load Transformers.js + ONNX Runtime WASM from jsDelivr.
+       The whisper-base model is vendored on this origin. Audio is never uploaded
+       — only the library/runtime are fetched. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; style-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' https://cdn.jsdelivr.net; base-uri 'none'; object-src 'none'">
   <title>HSK 1 Tone Trainer</title>
   <meta name="description" content="Practice HSK 1 Mandarin vocabulary with pronunciation, pinyin, and microphone-based tone scoring.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -29,6 +28,6 @@
   </footer>
   <!-- Bump the ?v= token on every deploy so iOS Safari refetches the module
        graph instead of serving cached copies of changed files. -->
-  <script type="module" src="assets/js/app.js?v=20260630u"></script>
+  <script type="module" src="assets/js/app.js?v=20260630v"></script>
 </body>
 </html>
