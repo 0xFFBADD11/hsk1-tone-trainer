@@ -1,12 +1,18 @@
 // Web Worker running on-device speech recognition (Whisper) via Transformers.js.
-// Audio is transcribed in the browser; nothing is uploaded. During branch
-// development the library and model load from the jsDelivr / Hugging Face CDNs;
-// before merging to main these get vendored locally so connect-src stays 'self'.
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3'
+// Audio is transcribed in the browser; nothing is uploaded. The MODEL is
+// vendored on our own origin (assets/vendor/models), so it never comes from a
+// hub. The library + ONNX Runtime WASM are still pinned from jsDelivr for now;
+// vendoring those too (to reach connect-src 'self') is the final step.
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1'
 
 // GitHub Pages cannot send COOP/COEP headers, so SharedArrayBuffer (and thus
 // multi-threaded WASM) is unavailable — force single-threaded ONNX Runtime.
 env.backends.onnx.wasm.numThreads = 1
+
+// Load the model only from this site, not from a remote hub.
+env.allowRemoteModels = false
+env.allowLocalModels = true
+env.localModelPath = new URL('../vendor/models', import.meta.url).href
 
 let transcriber = null
 
