@@ -17,10 +17,19 @@ export function pronounceReady() {
 // Transformers.js progress events so the UI can show a download bar.
 export function loadModel(onProgress) {
   if (ready) return Promise.resolve()
-  if (!worker) {
-    worker = new Worker(new URL('./asr-worker.js', import.meta.url), { type: 'module' })
-  }
   return new Promise((resolve, reject) => {
+    if (!worker) {
+      try {
+        // Carry this module's ?v= cache-bust onto the worker URL so a deploy
+        // actually loads the new worker instead of a cached copy.
+        const workerUrl = new URL('./asr-worker.js', import.meta.url)
+        workerUrl.search = new URL(import.meta.url).search
+        worker = new Worker(workerUrl, { type: 'module' })
+      } catch (err) {
+        reject(new Error(`worker failed to start: ${err.message}`))
+        return
+      }
+    }
     const onMsg = (e) => {
       const m = e.data
       if (m.type === 'progress') {

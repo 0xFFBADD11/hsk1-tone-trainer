@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631m'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631m'
-import { el, clear } from './dom.js?v=20260631m'
-import { speak, speechSupported } from './speech.js?v=20260631m'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631m'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631m'
-import { createQuiz } from './quiz.js?v=20260631m'
-import { toWhisperInput } from './audio.js?v=20260631m'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631m'
+import { HSK1 } from '../data/hsk1.js?v=20260631n'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631n'
+import { el, clear } from './dom.js?v=20260631n'
+import { speak, speechSupported } from './speech.js?v=20260631n'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631n'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631n'
+import { createQuiz } from './quiz.js?v=20260631n'
+import { toWhisperInput } from './audio.js?v=20260631n'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631n'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631m · beam-search'
+const BUILD = '20260631n · worker-chrome-fix'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
