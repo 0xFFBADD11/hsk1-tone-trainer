@@ -1,12 +1,12 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630m'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630m'
-import { el, clear } from './dom.js?v=20260630m'
-import { speak, speechSupported } from './speech.js?v=20260630m'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630m'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630m'
-import { createQuiz } from './quiz.js?v=20260630m'
+import { HSK1 } from '../data/hsk1.js?v=20260630n'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630n'
+import { el, clear } from './dom.js?v=20260630n'
+import { speak, speechSupported } from './speech.js?v=20260630n'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630n'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630n'
+import { createQuiz } from './quiz.js?v=20260630n'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -59,7 +59,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630m · back-and-wordlist'
+const BUILD = '20260630n · wordlist-tooltip'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -127,8 +127,11 @@ function fillWordList(node) {
   for (const a of attempts) {
     const pct = scorePercent(a.score)
     const ok = pct >= ACCEPT_PERCENT
+    const tip = `${a.word.pinyin} — ${a.word.en}`
     items.append(el('button', {
       class: `wl-item ${ok ? 'good' : 'bad'} ${a.index === cur ? 'current' : ''}`,
+      title: tip,
+      'aria-label': `${a.word.hanzi}, ${tip}, ${pct}%`,
       onclick: () => jumpTo(a.index)
     }, [
       el('span', { class: 'wl-hanzi', text: a.word.hanzi }),
