@@ -1,18 +1,18 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630w'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630w'
-import { el, clear } from './dom.js?v=20260630w'
-import { speak, speechSupported } from './speech.js?v=20260630w'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630w'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630w'
-import { createQuiz } from './quiz.js?v=20260630w'
-import { toWhisperInput } from './audio.js?v=20260630w'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260630w'
+import { HSK1 } from '../data/hsk1.js?v=20260630x'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630x'
+import { el, clear } from './dom.js?v=20260630x'
+import { speak, speechSupported } from './speech.js?v=20260630x'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630x'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630x'
+import { createQuiz } from './quiz.js?v=20260630x'
+import { toWhisperInput } from './audio.js?v=20260630x'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260630x'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
-const SLOW_RATE = 0.4
+const SLOW_RATE = 0.3
 
 // A tone score at or above this percent counts as acceptable ("mastered").
 const ACCEPT_PERCENT = 70
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630w · sentence-pron'
+const BUILD = '20260630x · slower-slow'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
