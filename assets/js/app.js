@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630x'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630x'
-import { el, clear } from './dom.js?v=20260630x'
-import { speak, speechSupported } from './speech.js?v=20260630x'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630x'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630x'
-import { createQuiz } from './quiz.js?v=20260630x'
-import { toWhisperInput } from './audio.js?v=20260630x'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260630x'
+import { HSK1 } from '../data/hsk1.js?v=20260630y'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630y'
+import { el, clear } from './dom.js?v=20260630y'
+import { speak, speechSupported } from './speech.js?v=20260630y'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630y'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630y'
+import { createQuiz } from './quiz.js?v=20260630y'
+import { toWhisperInput } from './audio.js?v=20260630y'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260630y'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630x · slower-slow'
+const BUILD = '20260630y · click-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -170,20 +170,53 @@ function ensurePronModel() {
   })
 }
 
-// Lazy hanzi → per-character tone-marked pinyin array. Uses pinyin-pro from
-// jsDelivr. Returns [] on failure (e.g. offline) so callers degrade gracefully.
+// Lazy-load pinyin-pro (from jsDelivr). Returns the pinyin fn or null (offline).
 let pinyinFn = null
+async function ensurePinyin() {
+  if (pinyinFn) return pinyinFn
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/pinyin-pro@3/+esm')
+    pinyinFn = mod.pinyin
+  } catch {
+    pinyinFn = null
+  }
+  return pinyinFn
+}
+
+// Per-character tone-marked pinyin array; [] on failure so callers degrade.
 async function toPinyinArray(hanzi) {
   if (!hanzi) return []
+  const fn = await ensurePinyin()
+  if (!fn) return []
   try {
-    if (!pinyinFn) {
-      const mod = await import('https://cdn.jsdelivr.net/npm/pinyin-pro@3/+esm')
-      pinyinFn = mod.pinyin
-    }
-    return pinyinFn(hanzi, { toneType: 'symbol', type: 'array' })
+    return fn(hanzi, { toneType: 'symbol', type: 'array' })
   } catch {
     return []
   }
+}
+
+// Tone-marked pinyin for a whole word (syllables joined, no spaces).
+function wordPinyin(word) {
+  if (!pinyinFn) return ''
+  try {
+    return pinyinFn(word, { toneType: 'symbol', type: 'string' }).replace(/\s+/g, '')
+  } catch {
+    return ''
+  }
+}
+
+// Split a sentence into words using the browser's Chinese word segmenter, so a
+// clicked character can play its whole word. Falls back to per-character.
+function segmentSentence(text) {
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    try {
+      const seg = new Intl.Segmenter('zh', { granularity: 'word' })
+      return [...seg.segment(text)].map((s) => s.segment)
+    } catch {
+      // fall through
+    }
+  }
+  return [...text]
 }
 
 // Fill the top bar: prominent word count and a green mastered badge.
@@ -371,15 +404,23 @@ async function playSentence(word) {
   }
   speak(ex.hanzi)
 
-  const py = await toPinyinArray(ex.hanzi)
-  const chars = [...ex.hanzi]
-  const hanziRow = el('div', { class: 'ex-hanzi' }, chars.map((ch, i) => {
-    if (!/[一-鿿]/.test(ch)) return el('span', { text: ch })
-    const p = py[i] || ''
-    const known = HSK1.find((w) => w.hanzi === ch)
-    const title = known ? `${p} — ${known.en}`.trim() : p
-    return el('span', { class: 'ex-char', text: ch, title, onclick: () => speak(ch) })
-  }))
+  // Group the sentence into words so clicking any character speaks the whole
+  // word it belongs to, with the word's pinyin + English on hover.
+  await ensurePinyin()
+  const spans = []
+  for (const w of segmentSentence(ex.hanzi)) {
+    if (!/[一-鿿]/.test(w)) {
+      spans.push(el('span', { text: w }))
+      continue
+    }
+    const wp = wordPinyin(w)
+    const known = HSK1.find((x) => x.hanzi === w)
+    const title = known ? `${wp} — ${known.en}`.trim() : wp
+    for (const ch of [...w]) {
+      spans.push(el('span', { class: 'ex-char', text: ch, title, onclick: () => speak(w) }))
+    }
+  }
+  const hanziRow = el('div', { class: 'ex-hanzi' }, spans)
   box.append(
     hanziRow,
     el('div', { class: 'ex-pinyin', text: ex.pinyin }),
