@@ -203,6 +203,7 @@ main {
 .ex-word:hover { color: var(--accent-soft); background: rgba(255, 255, 255, 0.08); }
 .ex-target { font-weight: 700; color: var(--accent-soft); }
 .matched-green { font-weight: 700; color: var(--good); }
+.heard-wrong { color: var(--bad); }
 .read-sentence { margin-top: 0.5rem; }
 .ex-pinyin { color: var(--accent-soft); margin-top: 0.25rem; }
 .ex-en { color: var(--muted); margin-top: 0.2rem; font-size: 0.95rem; }
