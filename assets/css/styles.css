@@ -83,19 +83,24 @@ main {
 }
 .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Pronunciation toggle + status, sits below the strictness selector. */
-.pron {
+/* Bottom settings group: strictness + pronunciation toggle together. */
+.settings {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
-  margin-top: 0.6rem;
-  flex-wrap: wrap;
+  margin-top: 1.5rem;
 }
-.pron-status { color: var(--muted); font-size: 0.75rem; }
-.pron-line { margin: 0.3rem 0 0; }
-.pron-line.good { color: var(--good); }
-.pron-line.bad { color: var(--warn); }
+.settings .strictness { margin-top: 0; }
+
+/* Result sections (tone, pronunciation) share one style. */
+.result-section { margin-top: 0.6rem; }
+.section-head { font-weight: 600; margin: 0 0 0.2rem; }
+.section-head.good { color: var(--good); }
+.section-head.bad { color: var(--warn); }
+.syl.clickable { cursor: pointer; }
+.syl.clickable:hover { text-decoration: underline; }
+.syl-py { color: var(--muted); }
 
 .card {
   background: var(--panel);
@@ -242,6 +247,7 @@ footer {
   text-align: center;
 }
 footer p { margin: 0.25rem 0; }
+.app-status { min-height: 1em; }
 .build { font-size: 0.7rem; opacity: 0.6; margin: 0.35rem 0 0; }
 
 /* Practice area plus the side word list. Stacks on phones; side-by-side on wide

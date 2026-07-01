@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630p'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630p'
-import { el, clear } from './dom.js?v=20260630p'
-import { speak, speechSupported } from './speech.js?v=20260630p'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630p'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630p'
-import { createQuiz } from './quiz.js?v=20260630p'
-import { toWhisperInput } from './audio.js?v=20260630p'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, matchPronunciation } from './pronounce.js?v=20260630p'
+import { HSK1 } from '../data/hsk1.js?v=20260630q'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630q'
+import { el, clear } from './dom.js?v=20260630q'
+import { speak, speechSupported } from './speech.js?v=20260630q'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630q'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630q'
+import { createQuiz } from './quiz.js?v=20260630q'
+import { toWhisperInput } from './audio.js?v=20260630q'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, matchPronunciation } from './pronounce.js?v=20260630q'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -61,7 +61,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630p · local-model'
+const BUILD = '20260630q · pron-ux'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -76,9 +76,9 @@ let pronounceEnabled = loadPronPref()
 
 function loadPronPref() {
   try {
-    return window.localStorage.getItem('pron') === '1'
+    return window.localStorage.getItem('pron') !== '0'
   } catch {
-    return false
+    return true
   }
 }
 
@@ -113,22 +113,23 @@ function renderStrictness() {
   ])
 }
 
-// Opt-in pronunciation toggle. Shown only where Web Workers are available.
-function renderPronToggle() {
-  if (!pronounceSupported()) return null
-  return el('div', { class: 'pron', id: 'pron' }, [
-    el('button', {
+// Strictness + pronunciation controls, grouped at the very bottom.
+function renderSettings() {
+  const children = [renderStrictness()]
+  if (pronounceSupported()) {
+    children.push(el('button', {
       class: `chip pron-chip ${pronounceEnabled ? 'active' : ''}`,
       id: 'pron-chip',
       text: '🗣 Check pronunciation',
       onclick: () => togglePronunciation()
-    }),
-    el('span', { class: 'pron-status', id: 'pron-status', text: pronounceEnabled && pronounceReady() ? 'ready' : '' })
-  ])
+    }))
+  }
+  return el('div', { class: 'settings' }, children)
 }
 
+// Status text goes in the subtle footer line, not the practice area.
 function setPronStatus(text) {
-  const s = document.getElementById('pron-status')
+  const s = document.getElementById('app-status')
   if (s) s.textContent = text
 }
 
@@ -137,34 +138,46 @@ function updatePronChip() {
   if (chip) chip.classList.toggle('active', pronounceEnabled)
 }
 
-async function togglePronunciation() {
+function togglePronunciation() {
   pronounceEnabled = !pronounceEnabled
   try {
-    window.localStorage.setItem('pron', pronounceEnabled ? '1' : '')
+    window.localStorage.setItem('pron', pronounceEnabled ? '1' : '0')
   } catch {
     // Non-fatal: preference just won't persist.
   }
   updatePronChip()
-  if (!pronounceEnabled) {
-    setPronStatus('')
-    return
-  }
-  if (pronounceReady()) {
-    setPronStatus('ready')
-    return
-  }
-  setPronStatus('downloading model… (one time)')
-  try {
-    await loadModel((p) => {
-      if (p && p.status === 'progress' && p.file) {
-        setPronStatus(`downloading ${p.file} ${Math.round(p.progress || 0)}%`)
-      }
-    })
-    setPronStatus('ready')
-  } catch (e) {
+  if (pronounceEnabled) ensurePronModel()
+  else setPronStatus('')
+}
+
+// Load the model on demand (also called at startup when the toggle defaults on).
+function ensurePronModel() {
+  if (!pronounceEnabled || !pronounceSupported() || pronounceReady()) return
+  setPronStatus('Loading pronunciation model…')
+  loadModel((p) => {
+    if (p && p.status === 'progress' && p.file) {
+      setPronStatus(`Downloading pronunciation model… ${Math.round(p.progress || 0)}%`)
+    }
+  }).then(() => setPronStatus('Pronunciation model ready')).catch((e) => {
     pronounceEnabled = false
     updatePronChip()
-    setPronStatus(`failed: ${e.message}`)
+    setPronStatus(`Pronunciation model unavailable: ${e.message}`)
+  })
+}
+
+// Lazy hanzi → tone-marked pinyin (for the "heard" word). Uses pinyin-pro; on
+// the branch it loads from jsDelivr, to be vendored with the rest.
+let pinyinFn = null
+async function toPinyin(hanzi) {
+  if (!hanzi) return ''
+  try {
+    if (!pinyinFn) {
+      const mod = await import('https://cdn.jsdelivr.net/npm/pinyin-pro@3/+esm')
+      pinyinFn = mod.pinyin
+    }
+    return pinyinFn(hanzi, { toneType: 'symbol', type: 'string' })
+  } catch {
+    return ''
   }
 }
 
@@ -262,8 +275,7 @@ function renderWord() {
     ]),
     el('div', { class: 'example', id: 'example' }),
     el('div', { class: 'feedback', id: 'feedback' }),
-    renderStrictness(),
-    renderPronToggle()
+    renderSettings()
   ])
 
   app.append(el('div', { class: 'layout' }, [
@@ -285,10 +297,12 @@ function renderWord() {
 
 function wireRecordButton(word) {
   const btn = document.getElementById('record-btn')
+  let pressActive = false
 
   async function start(ev) {
     ev.preventDefault()
     if (recorder) return
+    pressActive = true
     // Hold the pointer captured on the button so the release fires here even
     // if the finger/cursor drifts off — avoids a premature stop and the
     // accidental text selection that made some presses register as misses.
@@ -298,10 +312,20 @@ function wireRecordButton(word) {
     // Must run synchronously inside the gesture, before any await, or iOS
     // Safari refuses to start the audio context.
     primeAudio()
-    setFeedback('Recording… release to score', 'info')
     btn.classList.add('active')
+    // Mic startup can lag; don't claim "Recording" until it's actually live.
+    setFeedback('Preparing mic…', 'info')
     try {
       recorder = await recordPitchContour(setMeter, { captureAudio: pronounceEnabled && pronounceReady() })
+      if (!pressActive) {
+        // Released before the mic came up — discard silently.
+        await recorder.stop()
+        recorder = null
+        setMeter(0)
+        clearFeedback()
+        return
+      }
+      setFeedback('Recording… release to score', 'info')
     } catch {
       recorder = null
       btn.classList.remove('active')
@@ -311,6 +335,7 @@ function wireRecordButton(word) {
   }
 
   async function stop() {
+    pressActive = false
     if (!recorder) return
     btn.classList.remove('active')
     const capture = await recorder.stop()
@@ -411,63 +436,38 @@ function evaluate(word, capture) {
     return
   }
   const result = scoreWord(contour, word.tones, STRICTNESS[strictness].gamma)
-  const percent = scorePercent(result.overall)
-  showResult(word, result, percent)
-  checkPronunciation(word, percent, capture)
+  const tonePercent = scorePercent(result.overall)
+  showResult(word, result, tonePercent)
+  checkPronunciation(word, result, tonePercent, capture)
 }
 
-// If pronunciation checking is on, transcribe the captured audio and append a
-// pass/fail line; a word is mastered only when tone and pronunciation both pass.
-function checkPronunciation(word, percent, capture) {
-  if (!pronounceEnabled || !pronounceReady()) return
-  if (!capture.audio || capture.audio.length === 0) return
-  const fb = document.getElementById('feedback')
-  if (fb) fb.append(el('p', { class: 'pron-line', id: 'pron-pending', text: 'Checking pronunciation…' }))
-  const pcm = toWhisperInput(capture.audio, capture.sampleRate)
-  transcribe(pcm).then((text) => {
-    const pending = document.getElementById('pron-pending')
-    if (pending) pending.remove()
-    const m = matchPronunciation(text, word)
-    showPronunciation(m, word)
-    if (percent >= ACCEPT_PERCENT && m.pass) {
-      mastered.add(word.hanzi)
-      fillTopbar(document.getElementById('topbar'))
-      fillWordList(document.getElementById('wordlist'))
-    }
-  }).catch((e) => {
-    const pending = document.getElementById('pron-pending')
-    if (pending) pending.textContent = `Pronunciation check failed: ${e.message}`
-  })
-}
-
-function showPronunciation(m, word) {
-  const fb = document.getElementById('feedback')
-  if (!fb) return
-  const text = m.pass
-    ? `Pronunciation ✓ — heard “${m.heard || '—'}”`
-    : `Pronunciation ✗ — heard “${m.heard || '—'}”, expected ${word.hanzi} (${word.pinyin})`
-  fb.append(el('p', { class: `pron-line ${m.pass ? 'good' : 'bad'}`, text }))
-}
-
-function showResult(word, result, percent) {
-  quiz.setScore(result.overall)
-  const passed = percent >= ACCEPT_PERCENT
-  // With pronunciation checking on, mastery waits for both tone AND pronunciation
-  // (handled in checkPronunciation); otherwise tone alone masters the word.
-  const willCheckPron = pronounceEnabled && pronounceReady()
-  if (passed && !willCheckPron) mastered.add(word.hanzi)
-
-  // Score-driven visual: ring the word card green on an acceptable attempt,
-  // red otherwise, so the result is obvious without reading the numbers.
+// Update the headline score, verdict, mastered badge and card ring. The headline
+// reflects the combined tone+pronunciation result (or tone alone when the check
+// is off / still pending).
+function setHeadline(percent, passed, note) {
+  const score = document.getElementById('score')
+  if (score) score.textContent = `${percent}%  ${verdict(percent)}${note ? ` · ${note}` : ''}`
+  const badge = document.getElementById('pass-badge')
+  if (badge) badge.textContent = passed ? '✓ Acceptable — mastered' : '↻ Not quite — try again'
+  const feedback = document.getElementById('feedback')
+  if (feedback) feedback.className = `feedback shown ${passed ? 'pass' : 'fail'}`
   const card = document.getElementById('word-card')
   if (card) {
     card.classList.toggle('pass', passed)
     card.classList.toggle('fail', !passed)
   }
+}
+
+function showResult(word, result, tonePercent) {
+  const willCheckPron = pronounceEnabled && pronounceReady()
+  const tonePassed = tonePercent >= ACCEPT_PERCENT
+  if (!willCheckPron) {
+    quiz.setScore(result.overall)
+    if (tonePassed) mastered.add(word.hanzi)
+  }
 
   const feedback = document.getElementById('feedback')
   clear(feedback)
-  feedback.className = `feedback shown ${passed ? 'pass' : 'fail'}`
 
   const rows = result.syllables.map((syl, i) =>
     el('li', {}, [
@@ -493,23 +493,97 @@ function showResult(word, result, percent) {
   })
 
   feedback.append(
-    el('div', { class: 'score', text: `${percent}%  ${verdict(percent)}` }),
-    el('div', {
-      class: 'pass-badge',
-      text: passed ? '✓ Acceptable — tone mastered' : '↻ Not quite — try again'
-    }),
-    plots,
-    el('p', { class: 'plot-legend' }, [
-      el('span', { class: 'leg-you', text: '— you' }),
-      el('span', { class: 'leg-target', text: '┄ target' })
+    el('div', { class: 'score', id: 'score' }),
+    el('div', { class: 'pass-badge', id: 'pass-badge' }),
+    el('div', { class: 'result-section' }, [
+      el('div', { class: 'section-head', text: `Tone ${tonePercent}%` }),
+      plots,
+      el('p', { class: 'plot-legend' }, [
+        el('span', { class: 'leg-you', text: '— you' }),
+        el('span', { class: 'leg-target', text: '┄ target' })
+      ]),
+      el('ul', { class: 'syllables' }, rows)
     ]),
-    el('ul', { class: 'syllables' }, rows)
+    el('div', { class: 'result-section', id: 'pron-result' })
   )
   for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 
-  // The score just changed: refresh the mastered badge and the word list.
-  fillTopbar(document.getElementById('topbar'))
-  fillWordList(document.getElementById('wordlist'))
+  setHeadline(tonePercent, tonePassed, willCheckPron ? 'checking sound…' : '')
+  if (!willCheckPron) {
+    fillTopbar(document.getElementById('topbar'))
+    fillWordList(document.getElementById('wordlist'))
+  }
+}
+
+// Transcribe the captured audio and render the pronunciation result in the same
+// style as the tone result. The headline score becomes tone × pronunciation, and
+// a word masters only when both pass.
+function checkPronunciation(word, result, tonePercent, capture) {
+  if (!pronounceEnabled || !pronounceReady()) return
+  if (!capture.audio || capture.audio.length === 0) return
+  const pr = document.getElementById('pron-result')
+  if (pr) {
+    clear(pr)
+    pr.append(el('p', { class: 'best-note', text: 'Checking pronunciation…' }))
+  }
+  const pcm = toWhisperInput(capture.audio, capture.sampleRate)
+  transcribe(pcm).then(async (text) => {
+    const m = matchPronunciation(text, word)
+    const heardPinyin = await toPinyin(m.heard)
+    renderPronResult(word, m, heardPinyin)
+    const combined = result.overall * m.ratio
+    const passed = tonePercent >= ACCEPT_PERCENT && m.pass
+    quiz.setScore(combined)
+    if (passed) mastered.add(word.hanzi)
+    setHeadline(scorePercent(combined), passed, '')
+    fillTopbar(document.getElementById('topbar'))
+    fillWordList(document.getElementById('wordlist'))
+  }).catch((e) => {
+    const box = document.getElementById('pron-result')
+    if (box) {
+      clear(box)
+      box.append(el('p', { class: 'best-note', text: `Pronunciation check failed: ${e.message}` }))
+    }
+    // Fall back to tone-only scoring so the attempt still counts.
+    quiz.setScore(result.overall)
+    if (tonePercent >= ACCEPT_PERCENT) mastered.add(word.hanzi)
+    setHeadline(tonePercent, tonePercent >= ACCEPT_PERCENT, '')
+    fillTopbar(document.getElementById('topbar'))
+    fillWordList(document.getElementById('wordlist'))
+  })
+}
+
+// A clickable hanzi that speaks on click and shows english/pinyin on hover.
+function hanziSpeakSpan(hanzi, pinyin, en) {
+  const attrs = { class: 'syl clickable', text: hanzi, onclick: () => speak(hanzi) }
+  if (en) attrs.title = pinyin ? `${en} (${pinyin})` : en
+  else if (pinyin) attrs.title = pinyin
+  return el('span', {}, [
+    el('span', attrs),
+    el('span', { class: 'syl-py', text: pinyin ? ` (${pinyin})` : '' })
+  ])
+}
+
+// Render the pronunciation result to match the tone result's font/icons/colors.
+function renderPronResult(word, m, heardPinyin) {
+  const pr = document.getElementById('pron-result')
+  if (!pr) return
+  clear(pr)
+  const known = HSK1.find((w) => w.hanzi === m.heard)
+  pr.append(
+    el('div', { class: `section-head ${m.pass ? 'good' : 'bad'}`, text: `Pronunciation ${m.pass ? '✓' : '✗'}` }),
+    el('ul', { class: 'syllables' }, [
+      el('li', {}, [
+        el('span', { text: 'expected ' }),
+        hanziSpeakSpan(word.hanzi, word.pinyin, word.en),
+        el('span', { text: ', heard ' }),
+        m.heard
+          ? hanziSpeakSpan(m.heard, heardPinyin, known ? known.en : null)
+          : el('span', { text: '(nothing)' }),
+        el('span', { text: ` — ${m.pass ? '✓' : '✗'}` })
+      ])
+    ])
+  )
 }
 
 function setFeedback(message, kind) {
@@ -517,6 +591,13 @@ function setFeedback(message, kind) {
   clear(feedback)
   feedback.className = `feedback shown ${kind}`
   feedback.append(el('p', { text: message }))
+}
+
+function clearFeedback() {
+  const feedback = document.getElementById('feedback')
+  if (!feedback) return
+  clear(feedback)
+  feedback.className = 'feedback'
 }
 
 // Move to the next word. The current word's score (if any) was already
@@ -561,5 +642,10 @@ function renderUnsupported() {
   ]))
 }
 
-if (!speechSupported() || !microphoneSupported()) renderUnsupported()
-else renderWord()
+if (!speechSupported() || !microphoneSupported()) {
+  renderUnsupported()
+} else {
+  renderWord()
+  // Pronunciation defaults on; start fetching the model so it's ready to use.
+  ensurePronModel()
+}
