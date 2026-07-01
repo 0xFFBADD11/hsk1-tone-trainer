@@ -1,18 +1,17 @@
 // Web Worker running on-device speech recognition (Whisper) via Transformers.js.
-// Audio is transcribed in the browser; nothing is uploaded. The MODEL is
-// vendored on our own origin (assets/vendor/models), so it never comes from a
-// hub. The library + ONNX Runtime WASM are still pinned from jsDelivr for now;
-// vendoring those too (to reach connect-src 'self') is the final step.
+// Audio is transcribed in the browser; nothing is uploaded. whisper-small is too
+// large to bundle within GitHub's 100 MB file limit, so the MODEL streams from
+// the Hugging Face hub (cached by the browser after first load). The library +
+// ONNX Runtime WASM come from jsDelivr.
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1'
 
 // GitHub Pages cannot send COOP/COEP headers, so SharedArrayBuffer (and thus
 // multi-threaded WASM) is unavailable — force single-threaded ONNX Runtime.
 env.backends.onnx.wasm.numThreads = 1
 
-// Load the model only from this site, not from a remote hub.
-env.allowRemoteModels = false
-env.allowLocalModels = true
-env.localModelPath = new URL('../vendor/models', import.meta.url).href
+// The model is fetched from the hub (it is larger than can be vendored here).
+env.allowRemoteModels = true
+env.allowLocalModels = false
 
 let transcriber = null
 
@@ -21,7 +20,7 @@ self.onmessage = async (e) => {
   try {
     if (msg.type === 'load') {
       if (!transcriber) {
-        transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
+        transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-small', {
           dtype: 'q8',
           progress_callback: (p) => self.postMessage({ type: 'progress', data: p })
         })
