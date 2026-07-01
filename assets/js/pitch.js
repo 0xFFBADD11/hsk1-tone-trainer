@@ -100,7 +100,7 @@ export function primeAudio() {
 // every animation frame. `onLevel(level)` is invoked each frame with the
 // current RMS (0..1) so the UI can drive a live meter. stop() resolves with
 // the F0 series plus capture diagnostics { contour, frames, voiced, peak }.
-export async function recordPitchContour(onLevel) {
+export async function recordPitchContour(onLevel, opts = {}) {
   const ctx = primeAudio() || new AudioCtx()
   if (ctx.state === 'suspended') await ctx.resume()
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -116,6 +116,21 @@ export async function recordPitchContour(onLevel) {
   source.connect(analyser)
   analyser.connect(sink)
   sink.connect(ctx.destination)
+
+  // Optional raw-PCM capture for the pronunciation check. Off by default, so the
+  // tone-only path is exactly as before. A ScriptProcessor taps the source in
+  // parallel and accumulates contiguous samples (unlike the analyser's frames).
+  const audioChunks = []
+  let processor = null
+  if (opts.captureAudio && ctx.createScriptProcessor) {
+    processor = ctx.createScriptProcessor(4096, 1, 1)
+    processor.onaudioprocess = (ev) => {
+      if (!running) return
+      audioChunks.push(new Float32Array(ev.inputBuffer.getChannelData(0)))
+    }
+    source.connect(processor)
+    processor.connect(sink)
+  }
 
   const frame = new Float32Array(analyser.fftSize)
   const contour = []
@@ -146,9 +161,14 @@ export async function recordPitchContour(onLevel) {
     source.disconnect()
     analyser.disconnect()
     sink.disconnect()
+    if (processor) {
+      processor.disconnect()
+      processor.onaudioprocess = null
+    }
     // Keep the primed context open for reuse; only close a throwaway one.
+    const sampleRate = ctx.sampleRate
     if (ctx !== primedCtx) await ctx.close()
-    return { contour, frames, voiced, peak }
+    return { contour, frames, voiced, peak, audio: audioChunks, sampleRate }
   }
 
   return { stop }
