@@ -1,18 +1,19 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631h'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631h'
-import { el, clear } from './dom.js?v=20260631h'
-import { speak, speechSupported } from './speech.js?v=20260631h'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631h'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631h'
-import { createQuiz } from './quiz.js?v=20260631h'
-import { toWhisperInput } from './audio.js?v=20260631h'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631h'
+import { HSK1 } from '../data/hsk1.js?v=20260631i'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631i'
+import { el, clear } from './dom.js?v=20260631i'
+import { speak, speechSupported } from './speech.js?v=20260631i'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631i'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631i'
+import { createQuiz } from './quiz.js?v=20260631i'
+import { toWhisperInput } from './audio.js?v=20260631i'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631i'
 
-// Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
-// so the contrast is clearly audible even on voices that compress the range.
-const SLOW_RATE = 0.3
+// Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
+// below that so the contrast is clearly audible.
+const NORMAL_RATE = 0.85
+const SLOW_RATE = 0.25
 
 // A tone score at or above this percent counts as acceptable ("mastered").
 const ACCEPT_PERCENT = 70
@@ -69,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631h · center-layout'
+const BUILD = '20260631i · panel-redesign'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -88,6 +89,22 @@ function loadPronPref() {
   } catch {
     return true
   }
+}
+
+// Slow-playback toggle: when on, every playback uses the slow rate.
+let slowMode = loadSlowPref()
+
+function loadSlowPref() {
+  try {
+    return window.localStorage.getItem('slow') === '1'
+  } catch {
+    return false
+  }
+}
+
+// Speak, honoring the slow toggle. Use this for all playback.
+function say(text) {
+  speak(text, slowMode ? SLOW_RATE : NORMAL_RATE)
 }
 
 function scorePercent(score) {
@@ -121,9 +138,17 @@ function renderStrictness() {
   ])
 }
 
-// Strictness + pronunciation controls, grouped at the very bottom.
+// Strictness + toggles (slow playback, pronunciation), grouped at the bottom.
 function renderSettings() {
-  const children = [renderStrictness()]
+  const children = [
+    renderStrictness(),
+    el('button', {
+      class: `chip ${slowMode ? 'active' : ''}`,
+      id: 'slow-chip',
+      text: '🐢 Slow',
+      onclick: () => toggleSlow()
+    })
+  ]
   if (pronounceSupported()) {
     children.push(el('button', {
       class: `chip pron-chip ${pronounceEnabled ? 'active' : ''}`,
@@ -133,6 +158,17 @@ function renderSettings() {
     }))
   }
   return el('div', { class: 'settings' }, children)
+}
+
+function toggleSlow() {
+  slowMode = !slowMode
+  try {
+    window.localStorage.setItem('slow', slowMode ? '1' : '0')
+  } catch {
+    // Non-fatal: preference just won't persist.
+  }
+  const chip = document.getElementById('slow-chip')
+  if (chip) chip.classList.toggle('active', slowMode)
 }
 
 // Status text goes in the subtle footer line, not the practice area.
@@ -253,7 +289,7 @@ function speakableSpans(text, target = '') {
     const known = HSK1.find((x) => x.hanzi === w)
     const title = known ? `${wp} — ${known.en}`.trim() : wp
     const cls = w === target ? 'ex-word ex-target' : 'ex-word'
-    spans.push(el('span', { class: cls, text: w, title, onclick: () => speak(w) }))
+    spans.push(el('span', { class: cls, text: w, title, onclick: () => say(w) }))
   }
   return spans
 }
@@ -282,7 +318,7 @@ function heardSpans(text, matchStart, matchLen, expectedChars) {
       else if (matchLen > 0 && start + j >= matchStart && start + j < end) cls = 'matched-green'
       return el('span', cls ? { class: cls, text: ch } : { text: ch })
     })
-    spans.push(el('span', { class: 'ex-word', title, onclick: () => speak(w) }, charSpans))
+    spans.push(el('span', { class: 'ex-word', title, onclick: () => say(w) }, charSpans))
     idx += wchars.length
   }
   return spans
@@ -330,85 +366,108 @@ function fillWordList(node) {
 }
 
 // When returning to a word that was already scored, restore its result status:
-// ring the card and note the best percent so far.
+// ring the card and note the best percent so far in the tone panel.
 function showBest(best) {
   const pct = scorePercent(best)
   const passed = pct >= ACCEPT_PERCENT
-  const card = document.getElementById('word-card')
-  if (card) {
-    card.classList.toggle('pass', passed)
-    card.classList.toggle('fail', !passed)
-  }
-  const fb = document.getElementById('feedback')
-  if (!fb) return
-  clear(fb)
-  fb.className = 'feedback shown'
-  fb.append(el('p', { class: 'best-note', text: `Best so far: ${pct}%  ${verdict(pct)}` }))
+  setCardRing(passed)
+  const box = document.getElementById('tone-result')
+  if (!box) return
+  clear(box)
+  box.className = 'score-panel shown'
+  box.append(el('p', { class: 'best-note', text: `Best so far: ${pct}%  ${verdict(pct)}` }))
+}
+
+// Pick a random example sentence for a word (data may be one object or an array).
+function pickExample(word) {
+  const ex = HSK1_EXAMPLES[word.hanzi]
+  if (!ex) return null
+  const list = Array.isArray(ex) ? ex : [ex]
+  return list[Math.floor(Math.random() * list.length)]
+}
+
+// A play (▶️) + hold-to-record (🎤) control pair for a panel.
+function playRecordControls(playLabel, onPlay, recordId, recordLabel) {
+  return el('div', { class: 'controls' }, [
+    iconBtn('▶️', playLabel, onPlay),
+    el('button', {
+      class: 'btn icon record',
+      id: recordId,
+      title: recordLabel,
+      'aria-label': recordLabel,
+      text: '🎤'
+    })
+  ])
 }
 
 function renderWord() {
   const word = quiz.current()
   if (!word) return renderSummary()
+  const ex = pickExample(word)
 
   clear(app)
-  const backAttrs = { class: 'btn ghost back', text: '← Back', onclick: () => prevWord() }
+  const backAttrs = { class: 'btn ghost', text: '← Back', onclick: () => prevWord() }
   if (quiz.currentIndex() === 0) backAttrs.disabled = 'disabled'
 
-  const practice = el('div', { class: 'practice' }, [
+  const wordCard = el('div', { class: 'card panel', id: 'word-card' }, [
+    el('div', {
+      class: 'hanzi word-speak',
+      title: `${word.pinyin} — ${word.en}`,
+      text: word.hanzi,
+      onclick: () => say(word.hanzi)
+    }),
+    el('div', { class: 'pinyin', text: word.pinyin }),
+    el('div', { class: 'english', text: word.en }),
+    playRecordControls('Play word', () => say(word.hanzi), 'record-btn', 'Hold to record'),
+    el('div', { class: 'meter' }, [el('div', { class: 'meter-bar', id: 'meter-bar' })])
+  ])
+
+  const sentenceCard = el('div', { class: 'card panel sentence' }, [
+    el('div', { class: 'ex-hanzi', id: 'ex-hanzi' }),
+    el('div', { class: 'ex-pinyin', text: ex ? ex.pinyin : '' }),
+    el('div', { class: 'ex-en', text: ex ? ex.en : 'No example sentence yet.' }),
+    ex ? playRecordControls('Play sentence', () => say(ex.hanzi), 'sentence-record-btn', 'Hold to read the sentence') : null,
+    el('div', { class: 'meter' }, [el('div', { class: 'meter-bar', id: 'sentence-meter-bar' })])
+  ])
+
+  app.append(
     el('div', { class: 'topbar', id: 'topbar' }),
-    el('div', { class: 'practice-grid' }, [
-      el('div', { class: 'card', id: 'word-card' }, [
-        el('div', {
-          class: 'hanzi word-speak',
-          title: `${word.pinyin} — ${word.en}`,
-          text: word.hanzi,
-          onclick: () => speak(word.hanzi)
-        }),
-        el('div', { class: 'pinyin', text: word.pinyin }),
-        el('div', { class: 'english', text: word.en })
-      ]),
-      el('div', { class: 'col-right' }, [
-        el('div', { class: 'controls playback' }, [
-          iconBtn('▶️', 'Play', () => speak(word.hanzi)),
-          iconBtn('🐢', 'Play slowly', () => speak(word.hanzi, SLOW_RATE)),
-          iconBtn('💬', 'Example sentence', () => playSentence(word))
-        ]),
-        el('div', { class: 'controls' }, [
-          el('button', { class: 'btn record', text: '🎤 Hold to record', id: 'record-btn' })
-        ]),
-        el('div', { class: 'meter', id: 'meter' }, [
-          el('div', { class: 'meter-bar', id: 'meter-bar' })
-        ]),
+    el('div', { class: 'layout' }, [
+      el('div', { class: 'practice-cols' }, [
+        el('div', { class: 'pair' }, [wordCard, el('div', { class: 'score-panel', id: 'tone-result' })]),
+        el('div', { class: 'pair' }, [sentenceCard, el('div', { class: 'score-panel', id: 'pron-result' })]),
         el('div', { class: 'controls nav' }, [
           el('button', backAttrs),
           el('button', { class: 'btn ghost next', text: 'Next →', onclick: () => nextWord() })
         ])
-      ])
-    ]),
-    el('div', { class: 'example', id: 'example' }),
-    el('div', { class: 'feedback', id: 'feedback' })
-  ])
-
-  // Settings sit below the layout so they center on the viewport, not within the
-  // left practice column.
-  app.append(
-    el('div', { class: 'layout' }, [
-      practice,
+      ]),
       el('aside', { class: 'wordlist', id: 'wordlist' })
     ]),
     renderSettings()
   )
+
   fillTopbar(document.getElementById('topbar'))
   fillWordList(document.getElementById('wordlist'))
   wireRecordButton(word)
+  if (ex) {
+    fillSentenceHanzi(ex, word)
+    wireSentenceRecord(word, ex)
+  }
 
-  // Restore the prior result if this word was already scored this session.
   const best = quiz.scoreAt(quiz.currentIndex())
   if (best !== undefined) showBest(best)
 
-  // Play the word automatically when it appears (after the first user gesture;
-  // browsers may suppress the very first utterance until the page is tapped).
-  speak(word.hanzi)
+  // Play the word automatically (blocked before the first gesture on cold load).
+  say(word.hanzi)
+}
+
+// Fill the sentence hanzi row with clickable words (target word bold).
+async function fillSentenceHanzi(ex, word) {
+  const row = document.getElementById('ex-hanzi')
+  if (!row) return
+  await ensurePinyin()
+  clear(row)
+  for (const span of speakableSpans(ex.hanzi, word.hanzi)) row.append(span)
 }
 
 function wireRecordButton(word) {
@@ -467,44 +526,9 @@ function wireRecordButton(word) {
   btn.addEventListener('pointercancel', stop)
 }
 
-// Show the example sentence: each hanzi is clickable to hear it, with pinyin +
-// English on hover. If pronunciation checking is on, also offer to read the
-// sentence aloud so the target word can be rated from it.
-async function playSentence(word) {
-  const box = document.getElementById('example')
-  if (!box) return
-  clear(box)
-  box.className = 'example shown'
-  const ex = HSK1_EXAMPLES[word.hanzi]
-  if (!ex) {
-    box.append(el('p', { class: 'ex-en', text: 'No example sentence for this word yet.' }))
-    return
-  }
-  speak(ex.hanzi)
-
-  // Group the sentence into words so clicking any character speaks the whole
-  // word it belongs to, with the word's pinyin + English on hover.
-  await ensurePinyin()
-  const hanziRow = el('div', { class: 'ex-hanzi' }, speakableSpans(ex.hanzi, word.hanzi))
-  box.append(
-    hanziRow,
-    el('div', { class: 'ex-pinyin', text: ex.pinyin }),
-    el('div', { class: 'ex-en', text: ex.en })
-  )
-  if (pronounceSupported()) {
-    box.append(
-      el('div', { class: 'controls' }, [
-        el('button', { class: 'btn ghost read-sentence', text: '🎙 Read the sentence', id: 'read-sentence-btn' })
-      ]),
-      el('div', { class: 'result-section', id: 'sentence-pron' })
-    )
-    wireSentenceRecord(word)
-  }
-}
-
 // Hold-to-record the sentence reading, then rate the target word from it.
-function wireSentenceRecord(word) {
-  const btn = document.getElementById('read-sentence-btn')
+function wireSentenceRecord(word, ex) {
+  const btn = document.getElementById('sentence-record-btn')
   if (!btn) return
   let pressActive = false
   let sentRec = null
@@ -512,8 +536,8 @@ function wireSentenceRecord(word) {
   async function start(ev) {
     ev.preventDefault()
     if (sentRec) return
-    if (!pronounceReady()) {
-      setSentencePron('Pronunciation model still loading…')
+    if (!pronounceEnabled || !pronounceReady()) {
+      setSentencePron('Turn on “Check pronunciation” below and let it load first.')
       return
     }
     pressActive = true
@@ -522,11 +546,11 @@ function wireSentenceRecord(word) {
     btn.classList.add('active')
     setSentencePron('Preparing mic…')
     try {
-      sentRec = await recordPitchContour(setMeter, { captureAudio: true })
+      sentRec = await recordPitchContour((l) => setMeter(l, 'sentence-meter-bar'), { captureAudio: true })
       if (!pressActive) {
         await sentRec.stop()
         sentRec = null
-        setMeter(0)
+        setMeter(0, 'sentence-meter-bar')
         setSentencePron('')
         return
       }
@@ -534,7 +558,7 @@ function wireSentenceRecord(word) {
     } catch {
       sentRec = null
       btn.classList.remove('active')
-      setMeter(0)
+      setMeter(0, 'sentence-meter-bar')
       setSentencePron(MIC_HELP)
     }
   }
@@ -545,8 +569,8 @@ function wireSentenceRecord(word) {
     btn.classList.remove('active')
     const capture = await sentRec.stop()
     sentRec = null
-    setMeter(0)
-    scoreSentence(word, capture)
+    setMeter(0, 'sentence-meter-bar')
+    scoreSentence(word, ex, capture)
   }
 
   btn.addEventListener('pointerdown', start)
@@ -602,8 +626,8 @@ function drawPlot(canvas, contour, target) {
 
 // Drive the live mic meter. RMS for speech sits around 0.05–0.2, so a square
 // root scale gives the bar visible travel without saturating immediately.
-function setMeter(level) {
-  const bar = document.getElementById('meter-bar')
+function setMeter(level, barId = 'meter-bar') {
+  const bar = document.getElementById(barId)
   if (!bar) return
   const pct = Math.min(100, Math.round(Math.sqrt(level) * 140))
   bar.style.width = `${pct}%`
@@ -639,9 +663,10 @@ function showResult(word, result, tonePercent) {
   quiz.setScore(result.overall)
   if (tonePassed) mastered.add(word.hanzi)
 
-  const feedback = document.getElementById('feedback')
-  clear(feedback)
-  feedback.className = 'feedback shown'
+  const box = document.getElementById('tone-result')
+  if (!box) return
+  clear(box)
+  box.className = 'score-panel shown'
 
   const rows = result.syllables.map((syl, i) =>
     el('li', {}, [
@@ -666,16 +691,14 @@ function showResult(word, result, tonePercent) {
     toDraw.push([canvas, syl])
   })
 
-  feedback.append(
-    el('div', { class: 'result-section' }, [
-      el('div', { class: `section-head ${tonePassed ? 'good' : 'bad'}`, text: `Tone ${tonePercent}% — ${verdict(tonePercent)}` }),
-      plots,
-      el('p', { class: 'plot-legend' }, [
-        el('span', { class: 'leg-you', text: '— you' }),
-        el('span', { class: 'leg-target', text: '┄ target' })
-      ]),
-      el('ul', { class: 'syllables' }, rows)
-    ])
+  box.append(
+    el('div', { class: `section-head ${tonePassed ? 'good' : 'bad'}`, text: `Tone ${tonePercent}% — ${verdict(tonePercent)}` }),
+    plots,
+    el('p', { class: 'plot-legend' }, [
+      el('span', { class: 'leg-you', text: '— you' }),
+      el('span', { class: 'leg-target', text: '┄ target' })
+    ]),
+    el('ul', { class: 'syllables' }, rows)
   )
   for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 
@@ -691,16 +714,17 @@ function pronStatus(closeness) {
 }
 
 function setSentencePron(text) {
-  const box = document.getElementById('sentence-pron')
+  const box = document.getElementById('pron-result')
   if (!box) return
   clear(box)
+  box.className = 'score-panel shown'
   box.append(el('p', { class: 'best-note', text }))
 }
 
 // Transcribe a full-sentence reading and rate just the target word within it,
 // by finding the best-matching syllable window. Whisper is far more reliable on
 // a sentence than on a lone syllable, so this rates the target more fairly.
-function scoreSentence(word, capture) {
+function scoreSentence(word, ex, capture) {
   if (!capture.audio || capture.audio.length === 0) {
     setSentencePron('No audio captured — try again.')
     return
@@ -715,26 +739,26 @@ function scoreSentence(word, capture) {
     const best = bestWindowCloseness(pyArr.map(tonelessPinyin), word.pinyin, word.tones.length)
     const matchedHanzi = heardChars.slice(best.start, best.start + best.length).join('')
     const matchedPinyin = pyArr.slice(best.start, best.start + best.length).join('')
-    renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin)
+    renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin)
     // Diagnostics go in the subtle footer status line, not the result box.
     setPronStatus(`audio ${durSec}s · raw “${text || '—'}”`)
   }).catch((e) => setSentencePron(`Pronunciation check failed: ${e.message}`))
 }
 
-// Set of characters in the expected example sentence, used to flag heard
-// characters that shouldn't be there.
-function expectedChars(word) {
-  const ex = HSK1_EXAMPLES[word.hanzi]
-  return new Set([...(ex ? ex.hanzi : word.hanzi)])
+// Set of characters in the shown example sentence, used to flag heard characters
+// that shouldn't be there.
+function expectedChars(ex, word) {
+  return new Set([...((ex && ex.hanzi) || word.hanzi)])
 }
 
 // Render the target word's pronunciation rating from the sentence reading. When
 // the target wasn't clearly found, also show the closest word actually heard,
 // with hanzi + pinyin.
-function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin) {
-  const box = document.getElementById('sentence-pron')
+function renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin) {
+  const box = document.getElementById('pron-result')
   if (!box) return
   clear(box)
+  box.className = 'score-panel shown'
   const st = pronStatus(best.closeness)
   const rows = [
     el('div', { class: `section-head ${st.cls}` }, [
@@ -742,7 +766,7 @@ function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin) {
         class: 'ex-word',
         text: word.hanzi,
         title: `${word.pinyin} — ${word.en}`,
-        onclick: () => speak(word.hanzi)
+        onclick: () => say(word.hanzi)
       }),
       el('span', { text: ` (${word.pinyin}): ${scorePercent(best.closeness)}% — ${st.label}` })
     ])
@@ -750,31 +774,33 @@ function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin) {
   if (best.closeness < PRON_ACCEPT && matchedHanzi) {
     rows.push(el('p', { class: 'best-note' }, [
       el('span', { text: 'closest heard: ' }),
-      el('span', { class: 'ex-word', text: matchedHanzi, onclick: () => speak(matchedHanzi) }),
+      el('span', { class: 'ex-word', text: matchedHanzi, onclick: () => say(matchedHanzi) }),
       el('span', { text: matchedPinyin ? ` (${matchedPinyin})` : '' })
     ]))
   }
   rows.push(
     el('p', { class: 'best-note' }, [
       el('span', { text: 'heard sentence: ' }),
-      ...(heard ? heardSpans(heard, best.start, best.length, expectedChars(word)) : [el('span', { text: '—' })])
+      ...(heard ? heardSpans(heard, best.start, best.length, expectedChars(ex, word)) : [el('span', { text: '—' })])
     ])
   )
   box.append(...rows)
 }
 
+// Word-side status (mic/errors) lives in the tone-result panel.
 function setFeedback(message, kind) {
-  const feedback = document.getElementById('feedback')
-  clear(feedback)
-  feedback.className = `feedback shown ${kind}`
-  feedback.append(el('p', { text: message }))
+  const box = document.getElementById('tone-result')
+  if (!box) return
+  clear(box)
+  box.className = `score-panel shown ${kind}`
+  box.append(el('p', { text: message }))
 }
 
 function clearFeedback() {
-  const feedback = document.getElementById('feedback')
-  if (!feedback) return
-  clear(feedback)
-  feedback.className = 'feedback'
+  const box = document.getElementById('tone-result')
+  if (!box) return
+  clear(box)
+  box.className = 'score-panel'
 }
 
 // Move to the next word. The current word's score (if any) was already
@@ -843,7 +869,7 @@ function onFirstGesture(ev) {
   if (onRecord) return
   requestMic()
   const word = quiz.current()
-  if (word) speak(word.hanzi)
+  if (word) say(word.hanzi)
 }
 
 if (!speechSupported() || !microphoneSupported()) {

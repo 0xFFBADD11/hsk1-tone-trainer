@@ -169,6 +169,9 @@ main {
   padding: 0.5rem 0;
 }
 .btn.icon:hover { background: var(--accent); }
+.btn.icon.record { background: var(--accent); color: #fff; }
+.btn.icon.record:hover { background: var(--accent-soft); }
+.btn.icon.record.active { background: var(--bad); box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.3); }
 /* Back and Next share one row under the record button, each taking half. */
 .controls.nav { gap: 0.6rem; }
 .controls.nav .btn { flex: 1; }
@@ -261,8 +264,21 @@ footer p { margin: 0.25rem 0; }
 /* Practice area plus the side word list. Stacks on phones; side-by-side on wide
    screens (see the media query below). */
 .layout { display: flex; flex-direction: column; gap: 1rem; }
-.practice { min-width: 0; }
+.practice-cols { min-width: 0; display: flex; flex-direction: column; gap: 1rem; }
 .best-note { margin: 0; color: var(--muted); }
+
+/* Each practice row pairs a panel (word/sentence) with its score panel. */
+.pair { display: flex; flex-direction: column; gap: 0.75rem; }
+.card.panel { margin: 0; }
+.score-panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 1rem;
+  text-align: center;
+}
+.score-panel:empty { display: none; }
+.score-panel.error { color: var(--bad); }
+.score-panel.info { color: var(--muted); }
 
 .wordlist {
   background: var(--panel);
@@ -300,31 +316,21 @@ footer p { margin: 0.25rem 0; }
 .wl-item.good .wl-pct { color: var(--good); }
 .wl-item.bad .wl-pct { color: var(--bad); }
 
-/* On wider viewports, place the word card and the record control side by side
-   so the core loop fits without scrolling, while phones stay single-column. */
-@media (min-width: 34rem) {
-  main { max-width: 40rem; }
-  .practice-grid {
+/* Wider screens: each panel sits beside its score panel. */
+@media (min-width: 46rem) {
+  main { max-width: 48rem; }
+  .pair {
     display: grid;
-    grid-template-columns: 1.1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
     align-items: start;
   }
-  .practice-grid .card { margin: 0; }
-  .practice-grid .col-right {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.6rem;
-    height: 100%;
-  }
-  .practice-grid .col-right .controls { margin-top: 0; }
 }
 
-/* Wide screens: word list becomes a fixed right-hand column. */
-@media (min-width: 54rem) {
-  main { max-width: 60rem; }
+/* Widest: the word list becomes a fixed right-hand column. */
+@media (min-width: 64rem) {
+  main { max-width: 72rem; }
   .layout { flex-direction: row; align-items: flex-start; }
-  .practice { flex: 1; }
+  .practice-cols { flex: 1; }
   .wordlist { width: 13rem; flex-shrink: 0; max-height: 75vh; }
 }
