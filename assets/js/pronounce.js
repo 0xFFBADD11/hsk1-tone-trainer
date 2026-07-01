@@ -62,14 +62,45 @@ export function transcribe(audio16k) {
   })
 }
 
-// Compare a Chinese transcription to the target word. Whisper outputs hanzi, so
-// we match on how many of the target's characters appear. Returns
-// { pass, heard, ratio }. Homophone characters can cause a miss; this is a
-// gross-error guard (e.g. "Bay" vs 喂), not a phonetic grader.
-export function matchPronunciation(transcription, word) {
-  const heard = (transcription || '').replace(/[\s，。！？、,.!?"'’]/g, '')
-  const chars = [...word.hanzi]
-  const present = chars.filter((c) => heard.includes(c)).length
-  const ratio = chars.length ? present / chars.length : 0
-  return { pass: ratio >= 0.5, heard, ratio }
+// Strip punctuation/whitespace from a transcription.
+export function cleanHeard(transcription) {
+  return (transcription || '').replace(/[\s，。！？、,.!?"'’“”]/g, '')
+}
+
+// Reduce pinyin to its segmental letters only — no tone marks, spaces, or
+// apostrophes — lowercased. Tone is scored separately, so we compare sounds.
+export function tonelessPinyin(pinyin) {
+  return (pinyin || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z]/g, '')
+    .toLowerCase()
+}
+
+function levenshtein(a, b) {
+  const m = a.length
+  const n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  let prev = Array.from({ length: n + 1 }, (_, j) => j)
+  for (let i = 1; i <= m; i++) {
+    const cur = [i]
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+    }
+    prev = cur
+  }
+  return prev[n]
+}
+
+// Phonetic closeness 0..1 between expected and heard pinyin, tones ignored. A
+// near miss (wei vs bei — one sound off) scores high; a different word (wei vs
+// hao) scores low. This grades "how close" rather than a hard match.
+export function pronunciationCloseness(expectedPinyin, heardPinyin) {
+  const a = tonelessPinyin(expectedPinyin)
+  const b = tonelessPinyin(heardPinyin)
+  if (!a && !b) return 1
+  if (!a || !b) return 0
+  return Math.max(0, 1 - levenshtein(a, b) / Math.max(a.length, b.length))
 }

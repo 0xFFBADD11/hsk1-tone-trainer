@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630q'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630q'
-import { el, clear } from './dom.js?v=20260630q'
-import { speak, speechSupported } from './speech.js?v=20260630q'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630q'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630q'
-import { createQuiz } from './quiz.js?v=20260630q'
-import { toWhisperInput } from './audio.js?v=20260630q'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, matchPronunciation } from './pronounce.js?v=20260630q'
+import { HSK1 } from '../data/hsk1.js?v=20260630r'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630r'
+import { el, clear } from './dom.js?v=20260630r'
+import { speak, speechSupported } from './speech.js?v=20260630r'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630r'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630r'
+import { createQuiz } from './quiz.js?v=20260630r'
+import { toWhisperInput } from './audio.js?v=20260630r'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, pronunciationCloseness } from './pronounce.js?v=20260630r'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -16,6 +16,11 @@ const SLOW_RATE = 0.4
 
 // A tone score at or above this percent counts as acceptable ("mastered").
 const ACCEPT_PERCENT = 70
+
+// Pronunciation closeness (0..1) bands: at/above ACCEPT is correct, above NEAR
+// is a near miss, below is a different word.
+const PRON_ACCEPT = 0.7
+const PRON_NEAR = 0.5
 
 // Pitch-overlay plot size (CSS px) and vertical scale (full height = this many
 // semitones of pitch movement, centered on each contour's mean).
@@ -61,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630q · pron-ux'
+const BUILD = '20260630r · pron-closeness'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -441,16 +446,7 @@ function evaluate(word, capture) {
   checkPronunciation(word, result, tonePercent, capture)
 }
 
-// Update the headline score, verdict, mastered badge and card ring. The headline
-// reflects the combined tone+pronunciation result (or tone alone when the check
-// is off / still pending).
-function setHeadline(percent, passed, note) {
-  const score = document.getElementById('score')
-  if (score) score.textContent = `${percent}%  ${verdict(percent)}${note ? ` · ${note}` : ''}`
-  const badge = document.getElementById('pass-badge')
-  if (badge) badge.textContent = passed ? '✓ Acceptable — mastered' : '↻ Not quite — try again'
-  const feedback = document.getElementById('feedback')
-  if (feedback) feedback.className = `feedback shown ${passed ? 'pass' : 'fail'}`
+function setCardRing(passed) {
   const card = document.getElementById('word-card')
   if (card) {
     card.classList.toggle('pass', passed)
@@ -458,6 +454,8 @@ function setHeadline(percent, passed, note) {
   }
 }
 
+// Render: Tone (percent + status) → tone readings → Pronunciation (percent +
+// status, filled in async) → expected/heard detail.
 function showResult(word, result, tonePercent) {
   const willCheckPron = pronounceEnabled && pronounceReady()
   const tonePassed = tonePercent >= ACCEPT_PERCENT
@@ -468,6 +466,7 @@ function showResult(word, result, tonePercent) {
 
   const feedback = document.getElementById('feedback')
   clear(feedback)
+  feedback.className = 'feedback shown'
 
   const rows = result.syllables.map((syl, i) =>
     el('li', {}, [
@@ -493,10 +492,8 @@ function showResult(word, result, tonePercent) {
   })
 
   feedback.append(
-    el('div', { class: 'score', id: 'score' }),
-    el('div', { class: 'pass-badge', id: 'pass-badge' }),
     el('div', { class: 'result-section' }, [
-      el('div', { class: 'section-head', text: `Tone ${tonePercent}%` }),
+      el('div', { class: `section-head ${tonePassed ? 'good' : 'bad'}`, text: `Tone ${tonePercent}% — ${verdict(tonePercent)}` }),
       plots,
       el('p', { class: 'plot-legend' }, [
         el('span', { class: 'leg-you', text: '— you' }),
@@ -508,34 +505,32 @@ function showResult(word, result, tonePercent) {
   )
   for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 
-  setHeadline(tonePercent, tonePassed, willCheckPron ? 'checking sound…' : '')
-  if (!willCheckPron) {
+  if (willCheckPron) {
+    const pr = document.getElementById('pron-result')
+    if (pr) pr.append(el('p', { class: 'best-note', text: 'Checking pronunciation…' }))
+  } else {
+    setCardRing(tonePassed)
     fillTopbar(document.getElementById('topbar'))
     fillWordList(document.getElementById('wordlist'))
   }
 }
 
-// Transcribe the captured audio and render the pronunciation result in the same
-// style as the tone result. The headline score becomes tone × pronunciation, and
-// a word masters only when both pass.
+// Transcribe the captured audio, grade how close it sounds to the target, and
+// render the pronunciation section. A word masters only when tone passes AND the
+// pronunciation is close enough.
 function checkPronunciation(word, result, tonePercent, capture) {
   if (!pronounceEnabled || !pronounceReady()) return
   if (!capture.audio || capture.audio.length === 0) return
-  const pr = document.getElementById('pron-result')
-  if (pr) {
-    clear(pr)
-    pr.append(el('p', { class: 'best-note', text: 'Checking pronunciation…' }))
-  }
   const pcm = toWhisperInput(capture.audio, capture.sampleRate)
   transcribe(pcm).then(async (text) => {
-    const m = matchPronunciation(text, word)
-    const heardPinyin = await toPinyin(m.heard)
-    renderPronResult(word, m, heardPinyin)
-    const combined = result.overall * m.ratio
-    const passed = tonePercent >= ACCEPT_PERCENT && m.pass
-    quiz.setScore(combined)
+    const heard = cleanHeard(text)
+    const heardPinyin = await toPinyin(heard)
+    const closeness = pronunciationCloseness(word.pinyin, heardPinyin)
+    renderPronResult(word, heard, heardPinyin, closeness)
+    const passed = tonePercent >= ACCEPT_PERCENT && closeness >= PRON_ACCEPT
+    quiz.setScore(result.overall * closeness)
     if (passed) mastered.add(word.hanzi)
-    setHeadline(scorePercent(combined), passed, '')
+    setCardRing(passed)
     fillTopbar(document.getElementById('topbar'))
     fillWordList(document.getElementById('wordlist'))
   }).catch((e) => {
@@ -546,11 +541,18 @@ function checkPronunciation(word, result, tonePercent, capture) {
     }
     // Fall back to tone-only scoring so the attempt still counts.
     quiz.setScore(result.overall)
-    if (tonePercent >= ACCEPT_PERCENT) mastered.add(word.hanzi)
-    setHeadline(tonePercent, tonePercent >= ACCEPT_PERCENT, '')
+    const tonePassed = tonePercent >= ACCEPT_PERCENT
+    if (tonePassed) mastered.add(word.hanzi)
+    setCardRing(tonePassed)
     fillTopbar(document.getElementById('topbar'))
     fillWordList(document.getElementById('wordlist'))
   })
+}
+
+function pronStatus(closeness) {
+  if (closeness >= PRON_ACCEPT) return { cls: 'good', label: '✅ Correct sound' }
+  if (closeness >= PRON_NEAR) return { cls: 'warn-status', label: '🟡 Near miss' }
+  return { cls: 'bad', label: '❌ Different word' }
 }
 
 // A clickable hanzi that speaks on click and shows english/pinyin on hover.
@@ -564,23 +566,23 @@ function hanziSpeakSpan(hanzi, pinyin, en) {
   ])
 }
 
-// Render the pronunciation result to match the tone result's font/icons/colors.
-function renderPronResult(word, m, heardPinyin) {
+// Render the pronunciation section to match the tone section's style.
+function renderPronResult(word, heard, heardPinyin, closeness) {
   const pr = document.getElementById('pron-result')
   if (!pr) return
   clear(pr)
-  const known = HSK1.find((w) => w.hanzi === m.heard)
+  const st = pronStatus(closeness)
+  const known = HSK1.find((w) => w.hanzi === heard)
   pr.append(
-    el('div', { class: `section-head ${m.pass ? 'good' : 'bad'}`, text: `Pronunciation ${m.pass ? '✓' : '✗'}` }),
+    el('div', { class: `section-head ${st.cls}`, text: `Pronunciation ${scorePercent(closeness)}% — ${st.label}` }),
     el('ul', { class: 'syllables' }, [
       el('li', {}, [
         el('span', { text: 'expected ' }),
         hanziSpeakSpan(word.hanzi, word.pinyin, word.en),
         el('span', { text: ', heard ' }),
-        m.heard
-          ? hanziSpeakSpan(m.heard, heardPinyin, known ? known.en : null)
-          : el('span', { text: '(nothing)' }),
-        el('span', { text: ` — ${m.pass ? '✓' : '✗'}` })
+        heard
+          ? hanziSpeakSpan(heard, heardPinyin, known ? known.en : null)
+          : el('span', { text: '(nothing)' })
       ])
     ])
   )

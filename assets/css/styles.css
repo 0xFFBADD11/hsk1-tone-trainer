@@ -97,7 +97,8 @@ main {
 .result-section { margin-top: 0.6rem; }
 .section-head { font-weight: 600; margin: 0 0 0.2rem; }
 .section-head.good { color: var(--good); }
-.section-head.bad { color: var(--warn); }
+.section-head.warn-status { color: var(--warn); }
+.section-head.bad { color: var(--bad); }
 .syl.clickable { cursor: pointer; }
 .syl.clickable:hover { text-decoration: underline; }
 .syl-py { color: var(--muted); }
