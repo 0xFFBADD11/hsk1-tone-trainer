@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631a'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631a'
-import { el, clear } from './dom.js?v=20260631a'
-import { speak, speechSupported } from './speech.js?v=20260631a'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631a'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631a'
-import { createQuiz } from './quiz.js?v=20260631a'
-import { toWhisperInput } from './audio.js?v=20260631a'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631a'
+import { HSK1 } from '../data/hsk1.js?v=20260631b'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631b'
+import { el, clear } from './dom.js?v=20260631b'
+import { speak, speechSupported } from './speech.js?v=20260631b'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631b'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631b'
+import { createQuiz } from './quiz.js?v=20260631b'
+import { toWhisperInput } from './audio.js?v=20260631b'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631b'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631a · hsk1-word-segmentation'
+const BUILD = '20260631b · mic-on-load'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -758,10 +758,40 @@ function renderUnsupported() {
   ]))
 }
 
+// Prompt for microphone access up front and release the stream immediately, so
+// recording later needs no prompt. Browsers may require a user gesture (iOS),
+// so this is also retried on the first tap. Leaves micDone false on failure so
+// the gesture retry can prompt.
+let micDone = false
+async function requestMic() {
+  if (micDone || !microphoneSupported()) return
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    for (const track of stream.getTracks()) track.stop()
+    micDone = true
+  } catch {
+    // Leave micDone false so the first user gesture can prompt.
+  }
+}
+
+// The first user gesture unlocks audio: request the mic and play the current
+// word (its autoplay was blocked on cold load). Skip if the tap is the record
+// button, which handles the mic itself and must not hear the word played back.
+function onFirstGesture(ev) {
+  const onRecord = ev.target && ev.target.closest && ev.target.closest('#record-btn')
+  if (onRecord) return
+  requestMic()
+  const word = quiz.current()
+  if (word) speak(word.hanzi)
+}
+
 if (!speechSupported() || !microphoneSupported()) {
   renderUnsupported()
 } else {
   renderWord()
   // Pronunciation defaults on; start fetching the model so it's ready to use.
   ensurePronModel()
+  // Ask for the mic on load (works on desktop); iOS retries on first gesture.
+  requestMic()
+  document.addEventListener('pointerdown', onFirstGesture, { capture: true, once: true })
 }
