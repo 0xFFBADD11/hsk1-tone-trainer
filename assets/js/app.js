@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631i'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631i'
-import { el, clear } from './dom.js?v=20260631i'
-import { speak, speechSupported } from './speech.js?v=20260631i'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631i'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631i'
-import { createQuiz } from './quiz.js?v=20260631i'
-import { toWhisperInput } from './audio.js?v=20260631i'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631i'
+import { HSK1 } from '../data/hsk1.js?v=20260631j'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631j'
+import { el, clear } from './dom.js?v=20260631j'
+import { speak, speechSupported } from './speech.js?v=20260631j'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631j'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631j'
+import { createQuiz } from './quiz.js?v=20260631j'
+import { toWhisperInput } from './audio.js?v=20260631j'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631j'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631i · panel-redesign'
+const BUILD = '20260631j · 3-sentences-slow-first'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -141,13 +141,13 @@ function renderStrictness() {
 // Strictness + toggles (slow playback, pronunciation), grouped at the bottom.
 function renderSettings() {
   const children = [
-    renderStrictness(),
     el('button', {
       class: `chip ${slowMode ? 'active' : ''}`,
       id: 'slow-chip',
       text: '🐢 Slow',
       onclick: () => toggleSlow()
-    })
+    }),
+    renderStrictness()
   ]
   if (pronounceSupported()) {
     children.push(el('button', {
