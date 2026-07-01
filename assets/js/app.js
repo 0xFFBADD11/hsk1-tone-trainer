@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631k'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631k'
-import { el, clear } from './dom.js?v=20260631k'
-import { speak, speechSupported } from './speech.js?v=20260631k'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631k'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631k'
-import { createQuiz } from './quiz.js?v=20260631k'
-import { toWhisperInput } from './audio.js?v=20260631k'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631k'
+import { HSK1 } from '../data/hsk1.js?v=20260631l'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631l'
+import { el, clear } from './dom.js?v=20260631l'
+import { speak, speechSupported } from './speech.js?v=20260631l'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631l'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631l'
+import { createQuiz } from './quiz.js?v=20260631l'
+import { toWhisperInput } from './audio.js?v=20260631l'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631l'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631k · perf-shuffle-checking'
+const BUILD = '20260631l · chinese-only'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -781,6 +781,11 @@ function scoreSentence(word, ex, capture) {
   const durSec = (pcm.length / 16000).toFixed(1)
   transcribe(pcm).then(async (text) => {
     const heard = cleanHeard(text)
+    if (!heard) {
+      setSentencePron('No Chinese heard — try again (background noise?).')
+      setPronStatus(`audio ${durSec}s · raw “${text || '—'}”`)
+      return
+    }
     const heardChars = [...heard]
     const pyArr = await toPinyinArray(heard)
     const best = bestWindowCloseness(pyArr.map(tonelessPinyin), word.pinyin, word.tones.length)

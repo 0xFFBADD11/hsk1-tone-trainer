@@ -62,9 +62,11 @@ export function transcribe(audio16k) {
   })
 }
 
-// Strip punctuation/whitespace from a transcription.
+// Keep only Chinese characters from a transcription, dropping English,
+// punctuation, digits and spaces. Whisper sometimes transcribes background
+// English (a radio, etc.) even with Chinese forced; this ignores all of that.
 export function cleanHeard(transcription) {
-  return (transcription || '').replace(/[\s，。！？、,.!?"'’“”]/g, '')
+  return (transcription || '').replace(/[^一-鿿]/g, '')
 }
 
 // Reduce pinyin to its segmental letters only — no tone marks, spaces, or

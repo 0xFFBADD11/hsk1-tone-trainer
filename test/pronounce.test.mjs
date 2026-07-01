@@ -2,8 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanHeard, tonelessPinyin, pronunciationCloseness, bestWindowCloseness } from '../assets/js/pronounce.js'
 
-test('cleanHeard strips punctuation and whitespace', () => {
+test('cleanHeard keeps only Chinese (drops English, punctuation, spaces)', () => {
   assert.equal(cleanHeard(' 你好，世界。'), '你好世界')
+  assert.equal(cleanHeard('i think 你好 ok'), '你好')
+  assert.equal(cleanHeard('i think we cant percent'), '')
 })
 
 test('tonelessPinyin drops tone marks, spaces, punctuation', () => {
