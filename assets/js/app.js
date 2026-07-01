@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631c'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631c'
-import { el, clear } from './dom.js?v=20260631c'
-import { speak, speechSupported } from './speech.js?v=20260631c'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631c'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631c'
-import { createQuiz } from './quiz.js?v=20260631c'
-import { toWhisperInput } from './audio.js?v=20260631c'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631c'
+import { HSK1 } from '../data/hsk1.js?v=20260631d'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631d'
+import { el, clear } from './dom.js?v=20260631d'
+import { speak, speechSupported } from './speech.js?v=20260631d'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631d'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631d'
+import { createQuiz } from './quiz.js?v=20260631d'
+import { toWhisperInput } from './audio.js?v=20260631d'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631d'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631c · bold-target'
+const BUILD = '20260631d · show-closest-heard'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -673,19 +673,24 @@ function scoreSentence(word, capture) {
   const durSec = (pcm.length / 16000).toFixed(1)
   transcribe(pcm).then(async (text) => {
     const heard = cleanHeard(text)
-    const syllables = (await toPinyinArray(heard)).map(tonelessPinyin).filter(Boolean)
-    const best = bestWindowCloseness(syllables, word.pinyin, word.tones.length)
-    renderSentencePron(word, heard, best, `audio ${durSec}s · raw “${text || '—'}”`)
+    const heardChars = [...heard]
+    const pyArr = await toPinyinArray(heard)
+    const best = bestWindowCloseness(pyArr.map(tonelessPinyin), word.pinyin, word.tones.length)
+    const matchedHanzi = heardChars.slice(best.start, best.start + best.length).join('')
+    const matchedPinyin = pyArr.slice(best.start, best.start + best.length).join('')
+    renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin, `audio ${durSec}s · raw “${text || '—'}”`)
   }).catch((e) => setSentencePron(`Pronunciation check failed: ${e.message}`))
 }
 
-// Render the target word's pronunciation rating from the sentence reading.
-function renderSentencePron(word, heard, best, debug) {
+// Render the target word's pronunciation rating from the sentence reading. When
+// the target wasn't clearly found, also show the closest word actually heard,
+// with hanzi + pinyin.
+function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin, debug) {
   const box = document.getElementById('sentence-pron')
   if (!box) return
   clear(box)
   const st = pronStatus(best.closeness)
-  box.append(
+  const rows = [
     el('div', { class: `section-head ${st.cls}` }, [
       el('span', {
         class: 'ex-word',
@@ -694,13 +699,23 @@ function renderSentencePron(word, heard, best, debug) {
         onclick: () => speak(word.hanzi)
       }),
       el('span', { text: ` (${word.pinyin}): ${scorePercent(best.closeness)}% — ${st.label}` })
-    ]),
+    ])
+  ]
+  if (best.closeness < PRON_ACCEPT && matchedHanzi) {
+    rows.push(el('p', { class: 'best-note' }, [
+      el('span', { text: 'closest heard: ' }),
+      el('span', { class: 'ex-word', text: matchedHanzi, onclick: () => speak(matchedHanzi) }),
+      el('span', { text: matchedPinyin ? ` (${matchedPinyin})` : '' })
+    ]))
+  }
+  rows.push(
     el('p', { class: 'best-note' }, [
       el('span', { text: 'heard sentence: ' }),
       ...(heard ? speakableSpans(heard, word.hanzi) : [el('span', { text: '—' })])
     ]),
     el('p', { class: 'best-note', text: debug })
   )
+  box.append(...rows)
 }
 
 function setFeedback(message, kind) {

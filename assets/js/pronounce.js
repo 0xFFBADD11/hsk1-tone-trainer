@@ -112,18 +112,19 @@ export function pronunciationCloseness(expectedPinyin, heardPinyin) {
 // syllable.
 export function bestWindowCloseness(heardSyllables, expectedPinyin, targetSyllableCount) {
   const k = Math.max(1, targetSyllableCount || 1)
-  const windows = []
   if (heardSyllables.length <= k) {
-    windows.push(heardSyllables.join(''))
-  } else {
-    for (let i = 0; i + k <= heardSyllables.length; i++) {
-      windows.push(heardSyllables.slice(i, i + k).join(''))
+    return {
+      closeness: pronunciationCloseness(expectedPinyin, heardSyllables.join('')),
+      matched: heardSyllables.join(''),
+      start: 0,
+      length: heardSyllables.length
     }
   }
-  let best = { closeness: 0, matched: '' }
-  for (const w of windows) {
-    const c = pronunciationCloseness(expectedPinyin, w)
-    if (c > best.closeness) best = { closeness: c, matched: w }
+  let best = { closeness: -1, matched: '', start: 0, length: k }
+  for (let i = 0; i + k <= heardSyllables.length; i++) {
+    const joined = heardSyllables.slice(i, i + k).join('')
+    const c = pronunciationCloseness(expectedPinyin, joined)
+    if (c > best.closeness) best = { closeness: c, matched: joined, start: i, length: k }
   }
   return best
 }
