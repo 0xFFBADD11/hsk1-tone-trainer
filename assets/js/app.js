@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631d'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631d'
-import { el, clear } from './dom.js?v=20260631d'
-import { speak, speechSupported } from './speech.js?v=20260631d'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631d'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631d'
-import { createQuiz } from './quiz.js?v=20260631d'
-import { toWhisperInput } from './audio.js?v=20260631d'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631d'
+import { HSK1 } from '../data/hsk1.js?v=20260631e'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631e'
+import { el, clear } from './dom.js?v=20260631e'
+import { speak, speechSupported } from './speech.js?v=20260631e'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631e'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631e'
+import { createQuiz } from './quiz.js?v=20260631e'
+import { toWhisperInput } from './audio.js?v=20260631e'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631e'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631d · show-closest-heard'
+const BUILD = '20260631e · heard-green-css-bust'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -251,6 +251,34 @@ function speakableSpans(text, target = '') {
     const title = known ? `${wp} — ${known.en}`.trim() : wp
     const cls = w === target ? 'ex-word ex-target' : 'ex-word'
     spans.push(el('span', { class: cls, text: w, title, onclick: () => speak(w) }))
+  }
+  return spans
+}
+
+// Like speakableSpans, but colors green the word(s) overlapping the character
+// range [matchStart, matchStart+matchLen) — i.e. what matched the target in the
+// heard sentence.
+function heardSpans(text, matchStart, matchLen) {
+  const spans = []
+  const end = matchStart + matchLen
+  let idx = 0
+  for (const w of segmentSentence(text)) {
+    const wlen = [...w].length
+    if (!/[一-鿿]/.test(w)) {
+      spans.push(el('span', { text: w }))
+    } else {
+      const wp = wordPinyin(w)
+      const known = HSK1.find((x) => x.hanzi === w)
+      const title = known ? `${wp} — ${known.en}`.trim() : wp
+      const green = matchLen > 0 && idx < end && idx + wlen > matchStart
+      spans.push(el('span', {
+        class: green ? 'ex-word matched-green' : 'ex-word',
+        text: w,
+        title,
+        onclick: () => speak(w)
+      }))
+    }
+    idx += wlen
   }
   return spans
 }
@@ -711,7 +739,7 @@ function renderSentencePron(word, heard, best, matchedHanzi, matchedPinyin, debu
   rows.push(
     el('p', { class: 'best-note' }, [
       el('span', { text: 'heard sentence: ' }),
-      ...(heard ? speakableSpans(heard, word.hanzi) : [el('span', { text: '—' })])
+      ...(heard ? heardSpans(heard, best.start, best.length) : [el('span', { text: '—' })])
     ]),
     el('p', { class: 'best-note', text: debug })
   )
