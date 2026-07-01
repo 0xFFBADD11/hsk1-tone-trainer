@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260630v'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630v'
-import { el, clear } from './dom.js?v=20260630v'
-import { speak, speechSupported } from './speech.js?v=20260630v'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630v'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260630v'
-import { createQuiz } from './quiz.js?v=20260630v'
-import { toWhisperInput } from './audio.js?v=20260630v'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, pronunciationCloseness } from './pronounce.js?v=20260630v'
+import { HSK1 } from '../data/hsk1.js?v=20260630w'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260630w'
+import { el, clear } from './dom.js?v=20260630w'
+import { speak, speechSupported } from './speech.js?v=20260630w'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260630w'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260630w'
+import { createQuiz } from './quiz.js?v=20260630w'
+import { toWhisperInput } from './audio.js?v=20260630w'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260630w'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -66,7 +66,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260630v · revert-to-base'
+const BUILD = '20260630w · sentence-pron'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -170,19 +170,19 @@ function ensurePronModel() {
   })
 }
 
-// Lazy hanzi → tone-marked pinyin (for the "heard" word). Uses pinyin-pro; on
-// the branch it loads from jsDelivr, to be vendored with the rest.
+// Lazy hanzi → per-character tone-marked pinyin array. Uses pinyin-pro from
+// jsDelivr. Returns [] on failure (e.g. offline) so callers degrade gracefully.
 let pinyinFn = null
-async function toPinyin(hanzi) {
-  if (!hanzi) return ''
+async function toPinyinArray(hanzi) {
+  if (!hanzi) return []
   try {
     if (!pinyinFn) {
       const mod = await import('https://cdn.jsdelivr.net/npm/pinyin-pro@3/+esm')
       pinyinFn = mod.pinyin
     }
-    return pinyinFn(hanzi, { toneType: 'symbol', type: 'string' })
+    return pinyinFn(hanzi, { toneType: 'symbol', type: 'array' })
   } catch {
-    return ''
+    return []
   }
 }
 
@@ -321,7 +321,7 @@ function wireRecordButton(word) {
     // Mic startup can lag; don't claim "Recording" until it's actually live.
     setFeedback('Preparing mic…', 'info')
     try {
-      recorder = await recordPitchContour(setMeter, { captureAudio: pronounceEnabled && pronounceReady() })
+      recorder = await recordPitchContour(setMeter)
       if (!pressActive) {
         // Released before the mic came up — discard silently.
         await recorder.stop()
@@ -356,8 +356,10 @@ function wireRecordButton(word) {
   btn.addEventListener('pointercancel', stop)
 }
 
-// Show the example sentence for a word (hanzi + pinyin + English) and speak it.
-function playSentence(word) {
+// Show the example sentence: each hanzi is clickable to hear it, with pinyin +
+// English on hover. If pronunciation checking is on, also offer to read the
+// sentence aloud so the target word can be rated from it.
+async function playSentence(word) {
   const box = document.getElementById('example')
   if (!box) return
   clear(box)
@@ -367,12 +369,83 @@ function playSentence(word) {
     box.append(el('p', { class: 'ex-en', text: 'No example sentence for this word yet.' }))
     return
   }
+  speak(ex.hanzi)
+
+  const py = await toPinyinArray(ex.hanzi)
+  const chars = [...ex.hanzi]
+  const hanziRow = el('div', { class: 'ex-hanzi' }, chars.map((ch, i) => {
+    if (!/[一-鿿]/.test(ch)) return el('span', { text: ch })
+    const p = py[i] || ''
+    const known = HSK1.find((w) => w.hanzi === ch)
+    const title = known ? `${p} — ${known.en}`.trim() : p
+    return el('span', { class: 'ex-char', text: ch, title, onclick: () => speak(ch) })
+  }))
   box.append(
-    el('div', { class: 'ex-hanzi', text: ex.hanzi }),
+    hanziRow,
     el('div', { class: 'ex-pinyin', text: ex.pinyin }),
     el('div', { class: 'ex-en', text: ex.en })
   )
-  speak(ex.hanzi)
+  if (pronounceSupported()) {
+    box.append(
+      el('div', { class: 'controls' }, [
+        el('button', { class: 'btn ghost read-sentence', text: '🎙 Read the sentence', id: 'read-sentence-btn' })
+      ]),
+      el('div', { class: 'result-section', id: 'sentence-pron' })
+    )
+    wireSentenceRecord(word)
+  }
+}
+
+// Hold-to-record the sentence reading, then rate the target word from it.
+function wireSentenceRecord(word) {
+  const btn = document.getElementById('read-sentence-btn')
+  if (!btn) return
+  let pressActive = false
+  let sentRec = null
+
+  async function start(ev) {
+    ev.preventDefault()
+    if (sentRec) return
+    if (!pronounceReady()) {
+      setSentencePron('Pronunciation model still loading…')
+      return
+    }
+    pressActive = true
+    if (ev.pointerId !== undefined && btn.setPointerCapture) btn.setPointerCapture(ev.pointerId)
+    primeAudio()
+    btn.classList.add('active')
+    setSentencePron('Preparing mic…')
+    try {
+      sentRec = await recordPitchContour(setMeter, { captureAudio: true })
+      if (!pressActive) {
+        await sentRec.stop()
+        sentRec = null
+        setMeter(0)
+        setSentencePron('')
+        return
+      }
+      setSentencePron('Recording… read the whole sentence, then release')
+    } catch {
+      sentRec = null
+      btn.classList.remove('active')
+      setMeter(0)
+      setSentencePron('Microphone access was denied.')
+    }
+  }
+
+  async function stop() {
+    pressActive = false
+    if (!sentRec) return
+    btn.classList.remove('active')
+    const capture = await sentRec.stop()
+    sentRec = null
+    setMeter(0)
+    scoreSentence(word, capture)
+  }
+
+  btn.addEventListener('pointerdown', start)
+  btn.addEventListener('pointerup', stop)
+  btn.addEventListener('pointercancel', stop)
 }
 
 function cssVar(name) {
@@ -443,7 +516,6 @@ function evaluate(word, capture) {
   const result = scoreWord(contour, word.tones, STRICTNESS[strictness].gamma)
   const tonePercent = scorePercent(result.overall)
   showResult(word, result, tonePercent)
-  checkPronunciation(word, result, tonePercent, capture)
 }
 
 function setCardRing(passed) {
@@ -454,15 +526,12 @@ function setCardRing(passed) {
   }
 }
 
-// Render: Tone (percent + status) → tone readings → Pronunciation (percent +
-// status, filled in async) → expected/heard detail.
+// Render the tone result: percent + status, then the per-syllable readings and
+// pitch plots. Pronunciation is a separate, sentence-based flow (see below).
 function showResult(word, result, tonePercent) {
-  const willCheckPron = pronounceEnabled && pronounceReady()
   const tonePassed = tonePercent >= ACCEPT_PERCENT
-  if (!willCheckPron) {
-    quiz.setScore(result.overall)
-    if (tonePassed) mastered.add(word.hanzi)
-  }
+  quiz.setScore(result.overall)
+  if (tonePassed) mastered.add(word.hanzi)
 
   const feedback = document.getElementById('feedback')
   clear(feedback)
@@ -500,94 +569,61 @@ function showResult(word, result, tonePercent) {
         el('span', { class: 'leg-target', text: '┄ target' })
       ]),
       el('ul', { class: 'syllables' }, rows)
-    ]),
-    el('div', { class: 'result-section', id: 'pron-result' })
+    ])
   )
   for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 
-  if (willCheckPron) {
-    const pr = document.getElementById('pron-result')
-    if (pr) pr.append(el('p', { class: 'best-note', text: 'Checking pronunciation…' }))
-  } else {
-    setCardRing(tonePassed)
-    fillTopbar(document.getElementById('topbar'))
-    fillWordList(document.getElementById('wordlist'))
-  }
-}
-
-// Transcribe the captured audio, grade how close it sounds to the target, and
-// render the pronunciation section. A word masters only when tone passes AND the
-// pronunciation is close enough.
-function checkPronunciation(word, result, tonePercent, capture) {
-  if (!pronounceEnabled || !pronounceReady()) return
-  if (!capture.audio || capture.audio.length === 0) return
-  const pcm = toWhisperInput(capture.audio, capture.sampleRate)
-  const debug = `audio ${(pcm.length / 16000).toFixed(1)}s @ ${capture.sampleRate}Hz`
-  transcribe(pcm).then(async (text) => {
-    const heard = cleanHeard(text)
-    const heardPinyin = await toPinyin(heard)
-    const closeness = pronunciationCloseness(word.pinyin, heardPinyin)
-    renderPronResult(word, heard, heardPinyin, closeness, `${debug} · raw “${text || '—'}”`)
-    const passed = tonePercent >= ACCEPT_PERCENT && closeness >= PRON_ACCEPT
-    quiz.setScore(result.overall * closeness)
-    if (passed) mastered.add(word.hanzi)
-    setCardRing(passed)
-    fillTopbar(document.getElementById('topbar'))
-    fillWordList(document.getElementById('wordlist'))
-  }).catch((e) => {
-    const box = document.getElementById('pron-result')
-    if (box) {
-      clear(box)
-      box.append(el('p', { class: 'best-note', text: `Pronunciation check failed: ${e.message}` }))
-    }
-    // Fall back to tone-only scoring so the attempt still counts.
-    quiz.setScore(result.overall)
-    const tonePassed = tonePercent >= ACCEPT_PERCENT
-    if (tonePassed) mastered.add(word.hanzi)
-    setCardRing(tonePassed)
-    fillTopbar(document.getElementById('topbar'))
-    fillWordList(document.getElementById('wordlist'))
-  })
+  setCardRing(tonePassed)
+  fillTopbar(document.getElementById('topbar'))
+  fillWordList(document.getElementById('wordlist'))
 }
 
 function pronStatus(closeness) {
   if (closeness >= PRON_ACCEPT) return { cls: 'good', label: '✅ Correct sound' }
   if (closeness >= PRON_NEAR) return { cls: 'warn-status', label: '🟡 Near miss' }
-  return { cls: 'bad', label: '❌ Different word' }
+  return { cls: 'bad', label: '❌ Not heard' }
 }
 
-// A clickable hanzi that speaks on click and shows english/pinyin on hover.
-function hanziSpeakSpan(hanzi, pinyin, en) {
-  const attrs = { class: 'syl clickable', text: hanzi, onclick: () => speak(hanzi) }
-  if (en) attrs.title = pinyin ? `${en} (${pinyin})` : en
-  else if (pinyin) attrs.title = pinyin
-  return el('span', {}, [
-    el('span', attrs),
-    el('span', { class: 'syl-py', text: pinyin ? ` (${pinyin})` : '' })
-  ])
+function setSentencePron(text) {
+  const box = document.getElementById('sentence-pron')
+  if (!box) return
+  clear(box)
+  box.append(el('p', { class: 'best-note', text }))
 }
 
-// Render the pronunciation section to match the tone section's style.
-function renderPronResult(word, heard, heardPinyin, closeness, debug) {
-  const pr = document.getElementById('pron-result')
-  if (!pr) return
-  clear(pr)
-  const st = pronStatus(closeness)
-  const known = HSK1.find((w) => w.hanzi === heard)
-  pr.append(
-    el('div', { class: `section-head ${st.cls}`, text: `Pronunciation ${scorePercent(closeness)}% — ${st.label}` }),
-    el('ul', { class: 'syllables' }, [
-      el('li', {}, [
-        el('span', { text: 'expected ' }),
-        hanziSpeakSpan(word.hanzi, word.pinyin, word.en),
-        el('span', { text: ', heard ' }),
-        heard
-          ? hanziSpeakSpan(heard, heardPinyin, known ? known.en : null)
-          : el('span', { text: '(nothing)' })
-      ])
-    ])
+// Transcribe a full-sentence reading and rate just the target word within it,
+// by finding the best-matching syllable window. Whisper is far more reliable on
+// a sentence than on a lone syllable, so this rates the target more fairly.
+function scoreSentence(word, capture) {
+  if (!capture.audio || capture.audio.length === 0) {
+    setSentencePron('No audio captured — try again.')
+    return
+  }
+  setSentencePron('Checking pronunciation…')
+  const pcm = toWhisperInput(capture.audio, capture.sampleRate)
+  const durSec = (pcm.length / 16000).toFixed(1)
+  transcribe(pcm).then(async (text) => {
+    const heard = cleanHeard(text)
+    const syllables = (await toPinyinArray(heard)).map(tonelessPinyin).filter(Boolean)
+    const best = bestWindowCloseness(syllables, word.pinyin, word.tones.length)
+    renderSentencePron(word, heard, best, `audio ${durSec}s · raw “${text || '—'}”`)
+  }).catch((e) => setSentencePron(`Pronunciation check failed: ${e.message}`))
+}
+
+// Render the target word's pronunciation rating from the sentence reading.
+function renderSentencePron(word, heard, best, debug) {
+  const box = document.getElementById('sentence-pron')
+  if (!box) return
+  clear(box)
+  const st = pronStatus(best.closeness)
+  box.append(
+    el('div', {
+      class: `section-head ${st.cls}`,
+      text: `${word.hanzi} (${word.pinyin}): ${scorePercent(best.closeness)}% — ${st.label}`
+    }),
+    el('p', { class: 'best-note', text: `heard sentence: ${heard || '—'}` }),
+    el('p', { class: 'best-note', text: debug })
   )
-  if (debug) pr.append(el('p', { class: 'best-note', text: debug }))
 }
 
 function setFeedback(message, kind) {

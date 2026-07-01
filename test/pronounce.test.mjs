@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cleanHeard, tonelessPinyin, pronunciationCloseness } from '../assets/js/pronounce.js'
+import { cleanHeard, tonelessPinyin, pronunciationCloseness, bestWindowCloseness } from '../assets/js/pronounce.js'
 
 test('cleanHeard strips punctuation and whitespace', () => {
   assert.equal(cleanHeard(' 你好，世界。'), '你好世界')
@@ -34,4 +34,20 @@ test('near miss scores clearly higher than a different word', () => {
 
 test('empty heard scores 0', () => {
   assert.equal(pronunciationCloseness('wèi', ''), 0)
+})
+
+test('bestWindowCloseness finds a 2-syllable target inside a sentence', () => {
+  const heard = ['wǒ', 'xǐ', 'huān', 'nǐ'] // 我喜欢你
+  const best = bestWindowCloseness(heard, 'xǐhuan', 2)
+  assert.equal(best.closeness, 1)
+})
+
+test('bestWindowCloseness finds a 1-syllable target inside a sentence', () => {
+  const heard = ['wǒ', 'chī', 'fàn', 'le'] // 我吃饭了
+  assert.equal(bestWindowCloseness(heard, 'le', 1).closeness, 1)
+})
+
+test('bestWindowCloseness scores low when the target is absent', () => {
+  const heard = ['wǒ', 'chī', 'fàn']
+  assert.ok(bestWindowCloseness(heard, 'xǐhuan', 2).closeness < 0.5)
 })

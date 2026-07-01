@@ -104,3 +104,26 @@ export function pronunciationCloseness(expectedPinyin, heardPinyin) {
   if (!a || !b) return 0
   return Math.max(0, 1 - levenshtein(a, b) / Math.max(a.length, b.length))
 }
+
+// Given a sentence transcription split into per-syllable pinyin, find the window
+// of `targetSyllableCount` syllables that best matches the expected word, and
+// return its closeness and the matched pinyin. This rates a target word from a
+// full-sentence reading, where Whisper is far more reliable than on a lone
+// syllable.
+export function bestWindowCloseness(heardSyllables, expectedPinyin, targetSyllableCount) {
+  const k = Math.max(1, targetSyllableCount || 1)
+  const windows = []
+  if (heardSyllables.length <= k) {
+    windows.push(heardSyllables.join(''))
+  } else {
+    for (let i = 0; i + k <= heardSyllables.length; i++) {
+      windows.push(heardSyllables.slice(i, i + k).join(''))
+    }
+  }
+  let best = { closeness: 0, matched: '' }
+  for (const w of windows) {
+    const c = pronunciationCloseness(expectedPinyin, w)
+    if (c > best.closeness) best = { closeness: c, matched: w }
+  }
+  return best
+}
