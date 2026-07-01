@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260631g'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631g'
-import { el, clear } from './dom.js?v=20260631g'
-import { speak, speechSupported } from './speech.js?v=20260631g'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631g'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260631g'
-import { createQuiz } from './quiz.js?v=20260631g'
-import { toWhisperInput } from './audio.js?v=20260631g'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631g'
+import { HSK1 } from '../data/hsk1.js?v=20260631h'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260631h'
+import { el, clear } from './dom.js?v=20260631h'
+import { speak, speechSupported } from './speech.js?v=20260631h'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260631h'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260631h'
+import { createQuiz } from './quiz.js?v=20260631h'
+import { toWhisperInput } from './audio.js?v=20260631h'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260631h'
 
 // Playback rates. speak()'s default (0.85) is "normal"; Slow is well below it
 // so the contrast is clearly audible even on voices that compress the range.
@@ -69,7 +69,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260631g · diag-in-footer'
+const BUILD = '20260631h · center-layout'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -386,14 +386,18 @@ function renderWord() {
       ])
     ]),
     el('div', { class: 'example', id: 'example' }),
-    el('div', { class: 'feedback', id: 'feedback' }),
-    renderSettings()
+    el('div', { class: 'feedback', id: 'feedback' })
   ])
 
-  app.append(el('div', { class: 'layout' }, [
-    practice,
-    el('aside', { class: 'wordlist', id: 'wordlist' })
-  ]))
+  // Settings sit below the layout so they center on the viewport, not within the
+  // left practice column.
+  app.append(
+    el('div', { class: 'layout' }, [
+      practice,
+      el('aside', { class: 'wordlist', id: 'wordlist' })
+    ]),
+    renderSettings()
+  )
   fillTopbar(document.getElementById('topbar'))
   fillWordList(document.getElementById('wordlist'))
   wireRecordButton(word)

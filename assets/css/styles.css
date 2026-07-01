@@ -242,7 +242,7 @@ main {
 .leg-you { color: var(--accent-soft); }
 .leg-target { color: var(--good); }
 
-.syllables { list-style: none; padding: 0; margin: 0.6rem 0 0; text-align: left; }
+.syllables { list-style: none; padding: 0; margin: 0.6rem 0 0; text-align: center; }
 .syllables li { color: var(--muted); padding: 0.2rem 0; font-size: 0.95rem; }
 .syllables .syl { color: var(--accent-soft); margin-right: 0.5rem; }
 
