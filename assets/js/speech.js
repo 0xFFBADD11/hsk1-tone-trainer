@@ -6,10 +6,13 @@ export function speechSupported() {
 }
 
 function pickChineseVoice() {
-  const voices = window.speechSynthesis.getVoices()
-  return voices.find((v) => v.lang === 'zh-CN') ||
-    voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('zh')) ||
-    null
+  const zh = window.speechSynthesis.getVoices().filter((v) => (v.lang || '').toLowerCase().startsWith('zh'))
+  // Prefer a locally-installed voice; remote/enhanced voices sometimes produce
+  // no audio. Prefer zh-CN over other Chinese variants.
+  return zh.find((v) => v.lang === 'zh-CN' && v.localService) ||
+    zh.find((v) => v.localService) ||
+    zh.find((v) => v.lang === 'zh-CN') ||
+    zh[0] || null
 }
 
 function utterAndSpeak(text, rate) {
