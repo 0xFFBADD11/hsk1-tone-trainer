@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260701a'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260701a'
-import { el, clear } from './dom.js?v=20260701a'
-import { speak, speechSupported } from './speech.js?v=20260701a'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260701a'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260701a'
-import { createQuiz } from './quiz.js?v=20260701a'
-import { toWhisperInput } from './audio.js?v=20260701a'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260701a'
+import { HSK1 } from '../data/hsk1.js?v=20260701b'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260701b'
+import { el, clear } from './dom.js?v=20260701b'
+import { speak, speechSupported } from './speech.js?v=20260701b'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260701b'
+import { scoreWord, TONE_NAMES } from './tone.js?v=20260701b'
+import { createQuiz } from './quiz.js?v=20260701b'
+import { toWhisperInput } from './audio.js?v=20260701b'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260701b'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260701a · natural-voice'
+const BUILD = '20260701b · force-zh-cache-bust'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -782,7 +782,14 @@ function scoreSentence(word, ex, capture) {
   transcribe(pcm).then(async (text) => {
     const heard = cleanHeard(text)
     if (!heard) {
-      setSentencePron('No Chinese heard — try again (background noise?).')
+      // Empty after keeping only Chinese. If the recognizer returned Latin text
+      // it detected the wrong language — almost always a stale cached worker
+      // that isn't forcing Chinese; a hard reload replaces it. Otherwise it
+      // simply heard no speech.
+      const gotLatin = /[a-z]/i.test(text || '')
+      setSentencePron(gotLatin
+        ? 'Heard non-Chinese — the recognizer needs refreshing. Hard-reload the page (⌘/Ctrl+Shift+R) and try again.'
+        : 'No speech detected — check the mic and try again.')
       setPronStatus(`audio ${durSec}s · raw “${text || '—'}”`)
       return
     }
