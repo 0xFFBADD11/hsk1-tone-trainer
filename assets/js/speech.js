@@ -5,14 +5,20 @@ export function speechSupported() {
   return typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined'
 }
 
+// Rank Chinese voices by naturalness. Google's network voice sounds best;
+// Tingting is the standard macOS voice; the character voices (Eddy, Flo,
+// Grandma, Rocko, …) are deliberately robotic and rank last.
+function voiceRank(v) {
+  if (/google/i.test(v.name)) return 3
+  if (/^tingting/i.test(v.name)) return 2
+  return 1
+}
+
 function pickChineseVoice() {
-  const zh = window.speechSynthesis.getVoices().filter((v) => (v.lang || '').toLowerCase().startsWith('zh'))
-  // Prefer a locally-installed voice; remote/enhanced voices sometimes produce
-  // no audio. Prefer zh-CN over other Chinese variants.
-  return zh.find((v) => v.lang === 'zh-CN' && v.localService) ||
-    zh.find((v) => v.localService) ||
-    zh.find((v) => v.lang === 'zh-CN') ||
-    zh[0] || null
+  const voices = window.speechSynthesis.getVoices()
+  const zhCN = voices.filter((v) => (v.lang || '').toLowerCase() === 'zh-cn')
+  const pool = zhCN.length ? zhCN : voices.filter((v) => (v.lang || '').toLowerCase().startsWith('zh'))
+  return pool.slice().sort((a, b) => voiceRank(b) - voiceRank(a))[0] || null
 }
 
 function utterAndSpeak(text, rate) {
