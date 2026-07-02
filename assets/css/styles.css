@@ -96,6 +96,7 @@ main {
 /* Result sections (tone, pronunciation) share one style. */
 .result-section { margin-top: 0.6rem; }
 .section-head { font-weight: 600; margin: 0 0 0.2rem; }
+.sub-sep { height: 1px; margin: 0.6rem 0; background: rgba(255, 255, 255, 0.1); }
 .section-head.good { color: var(--good); }
 .section-head.warn-status { color: var(--warn); }
 .section-head.bad { color: var(--bad); }

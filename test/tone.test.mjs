@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { toSemitones, cleanContour, segment, scoreWord, toneTarget, PLOT_N } from '../assets/js/tone.js'
+import { toSemitones, cleanContour, segment, scoreWord, scoreWordInSentence, toneTarget, PLOT_N } from '../assets/js/tone.js'
 
 // Build a voiced syllable as an Hz series moving linearly from `fromSt` to
 // `toSt` semitones around a base, so tests exercise the real scorer.
@@ -102,4 +102,26 @@ test('too-short or empty input yields zero score, not a crash', () => {
   assert.equal(scoreWord([], [1]).overall, 0)
   assert.equal(scoreWord([0, 0, 0], [1]).overall, 0)
   assert.equal(scoreWord([150, 150], [1, 2]).overall, 0)
+})
+
+test('scoreWordInSentence scores the target word at its syllable position', () => {
+  // 3-syllable sentence: flat(1), rising(2), falling(4). Target is the 2nd word,
+  // a single rising syllable at index 1.
+  const hz = [
+    ...ramp(0, 0, 20), ...silence(6),
+    ...ramp(-3, 3, 20), ...silence(6),
+    ...ramp(4, -4, 20)
+  ]
+  const r = scoreWordInSentence(hz, 3, 1, [2])
+  assert.ok(r, 'expected a result')
+  assert.equal(r.syllables.length, 1)
+  assert.equal(r.syllables[0].detected, 2)
+  assert.ok(r.overall > 0.6, `overall ${r.overall}`)
+})
+
+test('scoreWordInSentence returns null when it cannot align', () => {
+  // Ask for 4 syllables from a contour with far too few voiced frames.
+  assert.equal(scoreWordInSentence([150, 150], 4, 0, [1]), null)
+  // Out-of-range slice.
+  assert.equal(scoreWordInSentence(ramp(0, 0, 60), 2, 2, [1]), null)
 })

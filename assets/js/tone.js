@@ -200,6 +200,32 @@ export function scoreWord(contourHz, expectedTones, gamma = 1) {
   return { overall: clamp01(overall), syllables }
 }
 
+// Score the target word's tones from a whole-SENTENCE F0 contour. The sentence
+// has `totalSyllables` voiced syllables; the target word occupies `tones.length`
+// of them starting at syllable `startIndex`. We segment the full contour, then
+// score the target's slice with the same per-syllable machinery as scoreWord.
+// Returns null when the contour can't be split into the expected syllable count
+// (so the caller omits the tone read rather than showing a misaligned guess).
+export function scoreWordInSentence(contourHz, totalSyllables, startIndex, tones, gamma = 1) {
+  if (!(totalSyllables > 0) || startIndex < 0 || startIndex + tones.length > totalSyllables) return null
+  const clean = cleanContour(Array.from(contourHz))
+  const segs = segment(clean, totalSyllables)
+  if (segs.length !== totalSyllables) return null
+  const slice = segs.slice(startIndex, startIndex + tones.length)
+  if (slice.length !== tones.length) return null
+  const syllables = tones.map((tone, i) => {
+    const r = scoreSyllable(slice[i], tone)
+    return {
+      score: clamp01(r.score ** gamma),
+      detected: r.detected,
+      contour: syllableContour(slice[i]),
+      target: toneTarget(tone)
+    }
+  })
+  const overall = mean(syllables.map((s) => s.score))
+  return { overall: clamp01(overall), syllables }
+}
+
 function clamp01(v) {
   if (!Number.isFinite(v)) return 0
   if (v < 0) return 0

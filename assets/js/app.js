@@ -1,14 +1,14 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260701b'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260701b'
-import { el, clear } from './dom.js?v=20260701b'
-import { speak, speechSupported } from './speech.js?v=20260701b'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260701b'
-import { scoreWord, TONE_NAMES } from './tone.js?v=20260701b'
-import { createQuiz } from './quiz.js?v=20260701b'
-import { toWhisperInput } from './audio.js?v=20260701b'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260701b'
+import { HSK1 } from '../data/hsk1.js?v=20260702a'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260702a'
+import { el, clear } from './dom.js?v=20260702a'
+import { speak, speechSupported } from './speech.js?v=20260702a'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260702a'
+import { scoreWord, scoreWordInSentence, TONE_NAMES } from './tone.js?v=20260702a'
+import { createQuiz } from './quiz.js?v=20260702a'
+import { toWhisperInput } from './audio.js?v=20260702a'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260702a'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,7 +70,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260701b · force-zh-cache-bust'
+const BUILD = '20260702a · sentence-tone-and-ring'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -450,7 +450,7 @@ function renderWord() {
     el('div', { class: 'meter' }, [el('div', { class: 'meter-bar', id: 'meter-bar' })])
   ])
 
-  const sentenceCard = el('div', { class: 'card panel sentence' }, [
+  const sentenceCard = el('div', { class: 'card panel sentence', id: 'sentence-card' }, [
     canShuffle
       ? el('button', { class: 'shuffle', title: 'Another sentence', 'aria-label': 'Another sentence', text: '↻', onclick: () => newSentence(word) })
       : null,
@@ -687,18 +687,20 @@ function setCardRing(passed) {
   }
 }
 
-// Render the tone result: percent + status, then the per-syllable readings and
-// pitch plots. Pronunciation is a separate, sentence-based flow (see below).
-function showResult(word, result, tonePercent) {
+function setSentenceCardRing(passed) {
+  const card = document.getElementById('sentence-card')
+  if (card) {
+    card.classList.toggle('pass', passed)
+    card.classList.toggle('fail', !passed)
+  }
+}
+
+// Build the tone read-out (percent + status, pitch plots, per-syllable rows) for
+// a scored word. Returns the nodes plus the canvases still to draw (drawPlot
+// must run after the caller appends them). Shared by the word panel and the
+// sentence panel's target-word tone read.
+function buildToneSection(word, result, tonePercent) {
   const tonePassed = tonePercent >= ACCEPT_PERCENT
-  quiz.setScore(result.overall)
-  if (tonePassed) mastered.add(word.hanzi)
-
-  const box = document.getElementById('tone-result')
-  if (!box) return
-  clear(box)
-  box.className = 'score-panel shown'
-
   const rows = result.syllables.map((syl, i) =>
     el('li', {}, [
       el('span', { class: 'syl', text: word.pinyin.split(' ').join('') }),
@@ -722,7 +724,7 @@ function showResult(word, result, tonePercent) {
     toDraw.push([canvas, syl])
   })
 
-  box.append(
+  const nodes = [
     el('div', { class: `section-head ${tonePassed ? 'good' : 'bad'}`, text: `Tone ${tonePercent}% — ${verdict(tonePercent)}` }),
     plots,
     el('p', { class: 'plot-legend' }, [
@@ -730,7 +732,24 @@ function showResult(word, result, tonePercent) {
       el('span', { class: 'leg-target', text: '┄ target' })
     ]),
     el('ul', { class: 'syllables' }, rows)
-  )
+  ]
+  return { nodes, toDraw }
+}
+
+// Render the tone result: percent + status, then the per-syllable readings and
+// pitch plots. Pronunciation is a separate, sentence-based flow (see below).
+function showResult(word, result, tonePercent) {
+  const tonePassed = tonePercent >= ACCEPT_PERCENT
+  quiz.setScore(result.overall)
+  if (tonePassed) mastered.add(word.hanzi)
+
+  const box = document.getElementById('tone-result')
+  if (!box) return
+  clear(box)
+  box.className = 'score-panel shown'
+
+  const { nodes, toDraw } = buildToneSection(word, result, tonePercent)
+  box.append(...nodes)
   for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 
   setCardRing(tonePassed)
@@ -798,10 +817,24 @@ function scoreSentence(word, ex, capture) {
     const best = bestWindowCloseness(pyArr.map(tonelessPinyin), word.pinyin, word.tones.length)
     const matchedHanzi = heardChars.slice(best.start, best.start + best.length).join('')
     const matchedPinyin = pyArr.slice(best.start, best.start + best.length).join('')
-    renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin)
+    // Also read the target word's tones from the sentence pitch contour.
+    const toneResult = sentenceToneForWord(word, ex, capture)
+    renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin, toneResult)
     // Diagnostics go in the subtle footer status line, not the result box.
     setPronStatus(`audio ${durSec}s · raw “${text || '—'}”`)
   }).catch((e) => setSentencePron(`Pronunciation check failed: ${e.message}`))
+}
+
+// Score the target word's tones from the sentence's F0 contour, aligning by the
+// word's syllable position in the (expected) sentence. Returns null when it
+// can't be aligned, so the caller simply omits the tone read.
+function sentenceToneForWord(word, ex, capture) {
+  if (!capture || !capture.contour || capture.contour.length === 0) return null
+  const sentence = (ex && ex.hanzi) || word.hanzi
+  const chars = [...sentence].filter((c) => /[一-鿿]/.test(c))
+  const startIndex = chars.join('').indexOf(word.hanzi)
+  if (startIndex < 0) return null
+  return scoreWordInSentence(capture.contour, chars.length, startIndex, word.tones, STRICTNESS[strictness].gamma)
 }
 
 // Set of characters in the shown example sentence, used to flag heard characters
@@ -813,7 +846,7 @@ function expectedChars(ex, word) {
 // Render the target word's pronunciation rating from the sentence reading. When
 // the target wasn't clearly found, also show the closest word actually heard,
 // with hanzi + pinyin.
-function renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin) {
+function renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin, toneResult) {
   const box = document.getElementById('pron-result')
   if (!box) return
   clear(box)
@@ -844,6 +877,21 @@ function renderSentencePron(word, ex, heard, best, matchedHanzi, matchedPinyin) 
     ])
   )
   box.append(...rows)
+
+  // Target word's tones, read from the sentence contour (aligned by position, so
+  // approximate — the word panel remains the precise tone check).
+  let toDraw = []
+  if (toneResult) {
+    const tonePercent = scorePercent(toneResult.overall)
+    const section = buildToneSection(word, toneResult, tonePercent)
+    box.append(el('div', { class: 'sub-sep' }), ...section.nodes)
+    toDraw = section.toDraw
+  }
+
+  // Ring the card green/red on the pronunciation result (its primary metric),
+  // mirroring the word card's tone ring.
+  setSentenceCardRing(best.closeness >= PRON_ACCEPT)
+  for (const [canvas, syl] of toDraw) drawPlot(canvas, syl.contour, syl.target)
 }
 
 // Word-side status (mic/errors) lives in the tone-result panel.
