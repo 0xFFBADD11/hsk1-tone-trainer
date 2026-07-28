@@ -1,16 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728a'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728a'
-import { el, clear } from './dom.js?v=20260728a'
-import { speak, speechSupported } from './speech.js?v=20260728a'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728a'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728a'
-import { createQuiz } from './quiz.js?v=20260728a'
-import { toWhisperInput } from './audio.js?v=20260728a'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728a'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728a'
-import { generateExample } from './example.js?v=20260728a'
+import { HSK1 } from '../data/hsk1.js?v=20260728b'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728b'
+import { el, clear } from './dom.js?v=20260728b'
+import { speak, speechSupported } from './speech.js?v=20260728b'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728b'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728b'
+import { createQuiz } from './quiz.js?v=20260728b'
+import { toWhisperInput } from './audio.js?v=20260728b'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728b'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728b'
+import { generateExample } from './example.js?v=20260728b'
+import { translateEnglish } from './translate.js?v=20260728b'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -72,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728a · custom-words-and-progress-persistence'
+const BUILD = '20260728b · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -1086,12 +1087,50 @@ function renderAddWord(prefill = {}) {
   const hanziInput = el('input', { type: 'text', class: 'field-input', placeholder: '你好', autocomplete: 'off', value: prefill.hanzi || '' })
   const pinyinInput = el('input', { type: 'text', class: 'field-input', placeholder: 'nǐ hǎo', autocomplete: 'off', value: prefill.pinyin || '' })
   const enInput = el('input', { type: 'text', class: 'field-input', placeholder: 'hello', autocomplete: 'off', value: prefill.en || '' })
+  const candidatesEl = el('div', { class: 'translate-candidates' })
 
-  async function autofill() {
+  async function autofillPinyinFromHanzi() {
     const hanzi = hanziInput.value.trim()
     if (!hanzi) return
     const py = await autofillPinyin(hanzi)
     if (py) pinyinInput.value = py
+  }
+
+  function applyCandidate(c) {
+    hanziInput.value = c.hanzi
+    pinyinInput.value = c.pinyin
+    enInput.value = c.en
+    clear(candidatesEl)
+  }
+
+  // Look up the typed English word/phrase and show ranked hanzi/pinyin
+  // candidates to pick from — picking one fills in the rest of the form
+  // rather than guessing, so a wrong sense never gets added silently.
+  async function lookup() {
+    const q = enInput.value.trim()
+    if (!q) return
+    clear(candidatesEl)
+    candidatesEl.append(el('p', { class: 'wordlist-empty', text: 'Looking up…' }))
+    const matches = await translateEnglish(q)
+    clear(candidatesEl)
+    if (matches.length === 0) {
+      candidatesEl.append(el('p', {
+        class: 'wordlist-empty',
+        text: 'No match found — fill in the Chinese and pinyin yourself, or try a different word.'
+      }))
+      return
+    }
+    for (const m of matches) {
+      candidatesEl.append(el('button', {
+        type: 'button',
+        class: 'translate-candidate',
+        onclick: () => applyCandidate(m)
+      }, [
+        el('span', { class: 'manage-hanzi', text: m.hanzi }),
+        el('span', { class: 'manage-pinyin', text: m.pinyin }),
+        el('span', { class: 'manage-en', text: m.en })
+      ]))
+    }
   }
 
   function submit(ev) {
@@ -1122,15 +1161,20 @@ function renderAddWord(prefill = {}) {
   app.append(
     el('form', { class: 'card form', onsubmit: submit }, [
       el('h2', { text: 'Add a word' }),
+      el('p', { class: 'field-hint', text: 'Type an English word and look it up, or fill in the Chinese/pinyin yourself.' }),
+      el('div', { class: 'field-row' }, [
+        el('label', { class: 'field-label', text: 'English' }),
+        el('button', { type: 'button', class: 'btn ghost small', text: '🔎 Look up', onclick: lookup })
+      ]),
+      enInput,
+      candidatesEl,
       el('label', { class: 'field-label', text: 'Chinese' }),
       hanziInput,
       el('div', { class: 'field-row' }, [
         el('label', { class: 'field-label', text: 'Pinyin — tone marks, syllables separated by spaces' }),
-        el('button', { type: 'button', class: 'btn ghost small', text: 'Auto-fill', onclick: autofill })
+        el('button', { type: 'button', class: 'btn ghost small', text: 'Auto-fill from Chinese', onclick: autofillPinyinFromHanzi })
       ]),
       pinyinInput,
-      el('label', { class: 'field-label', text: 'English' }),
-      enInput,
       errorEl,
       el('div', { class: 'controls' }, [
         el('button', { type: 'submit', class: 'btn', text: 'Add word' }),
