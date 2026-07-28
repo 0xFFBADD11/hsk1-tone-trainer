@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728c'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728c'
-import { el, clear } from './dom.js?v=20260728c'
-import { speak, speechSupported } from './speech.js?v=20260728c'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728c'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728c'
-import { createQuiz } from './quiz.js?v=20260728c'
-import { toWhisperInput } from './audio.js?v=20260728c'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728c'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728c'
-import { generateExample } from './example.js?v=20260728c'
-import { translateEnglish } from './translate.js?v=20260728c'
+import { HSK1 } from '../data/hsk1.js?v=20260728d'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728d'
+import { el, clear } from './dom.js?v=20260728d'
+import { speak, speechSupported } from './speech.js?v=20260728d'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728d'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728d'
+import { createQuiz } from './quiz.js?v=20260728d'
+import { toWhisperInput } from './audio.js?v=20260728d'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728d'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728d'
+import { generateExample } from './example.js?v=20260728d'
+import { translateEnglish } from './translate.js?v=20260728d'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728c · translate-english-to-add-word'
+const BUILD = '20260728d · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -1125,13 +1125,23 @@ function renderAddWord(prefill = {}) {
     const q = enInput.value.trim()
     if (!q) return
     clear(candidatesEl)
-    candidatesEl.append(el('p', { class: 'wordlist-empty', text: 'Looking up…' }))
-    const matches = await translateEnglish(q)
+    candidatesEl.append(el('p', { class: 'wordlist-empty', text: 'Looking up… (first use downloads a dictionary, a few seconds)' }))
+    let matches
+    try {
+      matches = await translateEnglish(q)
+    } catch (e) {
+      clear(candidatesEl)
+      candidatesEl.append(el('p', {
+        class: 'wordlist-empty',
+        text: `Couldn't load the dictionary (${e.message}). Check your connection and try again, or fill in the Chinese/pinyin yourself.`
+      }))
+      return
+    }
     clear(candidatesEl)
     if (matches.length === 0) {
       candidatesEl.append(el('p', {
         class: 'wordlist-empty',
-        text: 'No match found — fill in the Chinese and pinyin yourself, or try a different word.'
+        text: `No match for "${q}" — fill in the Chinese and pinyin yourself, or try a different word.`
       }))
       return
     }

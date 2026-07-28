@@ -11,12 +11,24 @@
 // `@leonsilicon/hsk2.0`) — a match that's actual everyday vocabulary sorts
 // first.
 
-import { numericPinyinToMarks } from './pinyin.js?v=20260728c'
+import { numericPinyinToMarks } from './pinyin.js?v=20260728d'
 
 const CEDICT_URL = 'https://cdn.jsdelivr.net/npm/cedict-json@1.3.20251213/+esm'
 const HSK_WORDS_URL = 'https://cdn.jsdelivr.net/npm/@leonsilicon/hsk2.0@0.0.0/HSK2.0_words.json'
 
 const MAX_CANDIDATES = 8
+// The dictionary is a multi-MB one-time download; on a slow connection this
+// bounds the wait so a stalled fetch fails outright instead of leaving
+// "Looking up…" stuck forever.
+const LOAD_TIMEOUT_MS = 20000
+
+function withTimeout(promise, ms, message) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
 
 let index = null // Map<normalized gloss clause, Array<{ entry, senseIndex, display }>>
 let hskWords = null // Set<string> of common (HSK 1-6) simplified words
@@ -96,33 +108,37 @@ export function lookupIndex(idx, hskWords, query) {
 }
 
 async function ensureLoaded() {
-  if (index) return true
+  if (index) return
   if (!loading) {
-    loading = (async () => {
+    const attempt = (async () => {
       const [cedictMod, words] = await Promise.all([
         import(CEDICT_URL),
-        fetch(HSK_WORDS_URL).then((r) => r.json())
+        fetch(HSK_WORDS_URL).then((r) => {
+          if (!r.ok) throw new Error(`HSK word list request failed (${r.status})`)
+          return r.json()
+        })
       ])
       hskWords = new Set(words)
       index = buildIndex(cedictMod.default)
     })()
+    loading = withTimeout(attempt, LOAD_TIMEOUT_MS, 'timed out loading the dictionary').catch((err) => {
+      // Let a later call retry instead of staying wedged on one failure
+      // (e.g. a transient network blip).
+      loading = null
+      throw err
+    })
   }
-  try {
-    await loading
-    return true
-  } catch {
-    loading = null
-    return false
-  }
+  await loading
 }
 
 // Ranked hanzi/pinyin/en candidates for an English word or short phrase.
 // Common (HSK) words sort first, then by how prominent the matched sense is
-// in the dictionary entry, then shorter words first. [] if unavailable or
-// there's no match.
+// in the dictionary entry, then shorter words first. [] if there's no match.
+// Throws if the dictionary itself couldn't be loaded (offline, CDN
+// unreachable) — the caller should show that as distinct from "no match",
+// since they call for different next steps.
 export async function translateEnglish(query) {
   if (!(query || '').trim()) return []
-  const ok = await ensureLoaded()
-  if (!ok) return []
+  await ensureLoaded()
   return lookupIndex(index, hskWords, query)
 }
