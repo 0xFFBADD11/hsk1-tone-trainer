@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728b'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728b'
-import { el, clear } from './dom.js?v=20260728b'
-import { speak, speechSupported } from './speech.js?v=20260728b'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728b'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728b'
-import { createQuiz } from './quiz.js?v=20260728b'
-import { toWhisperInput } from './audio.js?v=20260728b'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728b'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728b'
-import { generateExample } from './example.js?v=20260728b'
-import { translateEnglish } from './translate.js?v=20260728b'
+import { HSK1 } from '../data/hsk1.js?v=20260728c'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728c'
+import { el, clear } from './dom.js?v=20260728c'
+import { speak, speechSupported } from './speech.js?v=20260728c'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728c'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728c'
+import { createQuiz } from './quiz.js?v=20260728c'
+import { toWhisperInput } from './audio.js?v=20260728c'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728c'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728c'
+import { generateExample } from './example.js?v=20260728c'
+import { translateEnglish } from './translate.js?v=20260728c'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728b · translate-english-to-add-word'
+const BUILD = '20260728c · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -1086,7 +1086,22 @@ function renderAddWord(prefill = {}) {
   const errorEl = el('p', { class: 'form-error' })
   const hanziInput = el('input', { type: 'text', class: 'field-input', placeholder: '你好', autocomplete: 'off', value: prefill.hanzi || '' })
   const pinyinInput = el('input', { type: 'text', class: 'field-input', placeholder: 'nǐ hǎo', autocomplete: 'off', value: prefill.pinyin || '' })
-  const enInput = el('input', { type: 'text', class: 'field-input', placeholder: 'hello', autocomplete: 'off', value: prefill.en || '' })
+  const enInput = el('input', {
+    type: 'text',
+    class: 'field-input',
+    placeholder: 'hello',
+    autocomplete: 'off',
+    value: prefill.en || '',
+    // English is the first field now, so Enter reads as "search" — without
+    // this it falls through to the form's submit handler instead, which
+    // immediately fails validation on the still-empty Chinese field.
+    onkeydown: (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault()
+        lookup()
+      }
+    }
+  })
   const candidatesEl = el('div', { class: 'translate-candidates' })
 
   async function autofillPinyinFromHanzi() {
