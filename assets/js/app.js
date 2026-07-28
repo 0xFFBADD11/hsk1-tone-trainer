@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728g'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728g'
-import { el, clear } from './dom.js?v=20260728g'
-import { speak, speechSupported } from './speech.js?v=20260728g'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728g'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728g'
-import { createQuiz } from './quiz.js?v=20260728g'
-import { toWhisperInput } from './audio.js?v=20260728g'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728g'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728g'
-import { generateExample } from './example.js?v=20260728g'
-import { translateEnglish } from './translate.js?v=20260728g'
+import { HSK1 } from '../data/hsk1.js?v=20260728h'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728h'
+import { el, clear } from './dom.js?v=20260728h'
+import { speak, speechSupported } from './speech.js?v=20260728h'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728h'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728h'
+import { createQuiz } from './quiz.js?v=20260728h'
+import { toWhisperInput } from './audio.js?v=20260728h'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728h'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728h'
+import { generateExample } from './example.js?v=20260728h'
+import { translateEnglish } from './translate.js?v=20260728h'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728g · translate-english-to-add-word'
+const BUILD = '20260728h · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -165,9 +165,11 @@ function loadSlowPref() {
   }
 }
 
-// Speak, honoring the slow toggle. Use this for all playback.
+// Speak, honoring the slow toggle. Use this for all playback. Anything
+// unusual (no voice loaded yet, no Chinese voice installed, a synthesis
+// error) surfaces in the footer status line instead of failing silently.
 function say(text) {
-  speak(text, slowMode ? SLOW_RATE : NORMAL_RATE)
+  speak(text, slowMode ? SLOW_RATE : NORMAL_RATE, setPronStatus)
 }
 
 function scorePercent(score) {
@@ -608,11 +610,11 @@ function wireRecordButton(word) {
         return
       }
       setFeedback('Recording… release to score', 'info')
-    } catch {
+    } catch (e) {
       recorder = null
       btn.classList.remove('active')
       setMeter(0)
-      setFeedback(MIC_HELP, 'error')
+      setFeedback(`${MIC_HELP} (${e.message})`, 'error')
     }
   }
 
@@ -670,11 +672,11 @@ function wireSentenceRecord(word) {
         return
       }
       setSentencePron('Recording… read the whole sentence, then release')
-    } catch {
+    } catch (e) {
       sentRec = null
       btn.classList.remove('active')
       setMeter(0, 'sentence-meter-bar')
-      setSentencePron(MIC_HELP)
+      setSentencePron(`${MIC_HELP} (${e.message})`)
     }
   }
 

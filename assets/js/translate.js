@@ -11,7 +11,8 @@
 // `@leonsilicon/hsk2.0`) — a match that's actual everyday vocabulary sorts
 // first.
 
-import { numericPinyinToMarks } from './pinyin.js?v=20260728g'
+import { numericPinyinToMarks } from './pinyin.js?v=20260728h'
+import { withTimeout } from './timeout.js?v=20260728h'
 
 const CEDICT_URL = 'https://cdn.jsdelivr.net/npm/cedict-json@1.3.20251213/+esm'
 const HSK_WORDS_URL = 'https://cdn.jsdelivr.net/npm/@leonsilicon/hsk2.0@0.0.0/HSK2.0_words.json'
@@ -21,14 +22,6 @@ const MAX_CANDIDATES = 8
 // bounds the wait so a stalled fetch fails outright instead of leaving
 // "Looking up…" stuck forever.
 const LOAD_TIMEOUT_MS = 20000
-
-function withTimeout(promise, ms, message) {
-  let timer
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(message)), ms)
-  })
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
-}
 
 let index = null // Map<normalized gloss clause, Array<{ entry, senseIndex, display }>>
 let hskWords = null // Set<string> of common (HSK 1-6) simplified words
