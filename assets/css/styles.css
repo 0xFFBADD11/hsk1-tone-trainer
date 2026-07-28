@@ -365,6 +365,45 @@ footer p { margin: 0.25rem 0; }
   }
 }
 
+/* Add-word form and the "your added words" manager below it. */
+.form { text-align: left; }
+.form h2 { margin: 0 0 0.25rem; text-align: center; }
+.field-label { display: block; color: var(--muted); font-size: 0.8rem; margin: 0.75rem 0 0.3rem; }
+.field-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+.field-row .field-label { margin-bottom: 0; flex: 1; }
+.field-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  font-size: 1.1rem;
+}
+.field-input:focus { outline: none; border-color: var(--accent-soft); }
+.form-error { color: var(--bad); min-height: 1.1em; margin: 0.6rem 0 0; font-size: 0.9rem; }
+.btn.small { padding: 0.3rem 0.6rem; font-size: 0.85rem; flex: 0; }
+.btn.danger { border-color: var(--bad); color: var(--bad); }
+.btn.danger:hover { background: rgba(231, 76, 60, 0.12); color: var(--bad); }
+
+.word-manage { margin-top: 1rem; text-align: left; }
+.word-manage h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--muted); }
+.manage-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.manage-item:last-child { border-bottom: none; }
+.manage-hanzi { font-size: 1.2rem; min-width: 3rem; }
+.manage-pinyin { color: var(--accent-soft); min-width: 5rem; }
+.manage-en { color: var(--muted); flex: 1; }
+
+.danger-zone { margin-top: 1rem; text-align: center; }
+
+.confirm-tones { text-align: left; display: inline-block; }
+
 /* Widest: the word list becomes a fixed right-hand column. */
 @media (min-width: 64rem) {
   main { max-width: 72rem; }

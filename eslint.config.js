@@ -17,6 +17,7 @@ const browserGlobals = {
 }
 
 export default [
+  { ignores: ['.wrangler/**'] },
   {
     files: ['**/*.js', '**/*.mjs'],
     languageOptions: {
