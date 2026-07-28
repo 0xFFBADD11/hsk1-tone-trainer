@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728e'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728e'
-import { el, clear } from './dom.js?v=20260728e'
-import { speak, speechSupported } from './speech.js?v=20260728e'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728e'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728e'
-import { createQuiz } from './quiz.js?v=20260728e'
-import { toWhisperInput } from './audio.js?v=20260728e'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728e'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728e'
-import { generateExample } from './example.js?v=20260728e'
-import { translateEnglish } from './translate.js?v=20260728e'
+import { HSK1 } from '../data/hsk1.js?v=20260728f'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728f'
+import { el, clear } from './dom.js?v=20260728f'
+import { speak, speechSupported } from './speech.js?v=20260728f'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728f'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728f'
+import { createQuiz } from './quiz.js?v=20260728f'
+import { toWhisperInput } from './audio.js?v=20260728f'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728f'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728f'
+import { generateExample } from './example.js?v=20260728f'
+import { translateEnglish } from './translate.js?v=20260728f'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728e · translate-english-to-add-word'
+const BUILD = '20260728f · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -753,12 +753,20 @@ function setMeter(level, barId = 'meter-bar') {
   bar.style.width = `${pct}%`
 }
 
+// A peak this low means essentially no signal reached the mic pipeline at
+// all — different from genuinely speaking too quietly, which still produces
+// some non-zero peak. Seen on iOS after the shared AudioContext's mic
+// session degrades; a fresh reload gets a clean context.
+const SILENT_PEAK = 0.002
+
 function evaluate(word, capture) {
   const { contour, frames, voiced, peak } = capture
   if (voiced < word.tones.length * 3) {
+    const diag = `(frames ${frames}, peak ${peak.toFixed(3)}, voiced ${voiced})`
     setFeedback(
-      'Too quiet or too short — try speaking the whole word. ' +
-        `(frames ${frames}, peak ${peak.toFixed(3)}, voiced ${voiced})`,
+      peak < SILENT_PEAK
+        ? `No audio captured — the mic returned silence. Try reloading the page. ${diag}`
+        : `Too quiet or too short — try speaking the whole word. ${diag}`,
       'error'
     )
     return
