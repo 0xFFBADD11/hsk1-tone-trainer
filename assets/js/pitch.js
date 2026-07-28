@@ -3,6 +3,8 @@
 // short time-domain frames, which is robust enough for single-speaker tone
 // practice. Audio never leaves the browser.
 
+import { withTimeout } from './timeout.js?v=20260728h'
+
 const SAMPLE_FRAMES = 2048
 const MIN_HZ = 70
 const MAX_HZ = 500
@@ -96,14 +98,26 @@ export function primeAudio() {
   return primedCtx
 }
 
+// Mic setup (context resume, getUserMedia) has no native timeout and can
+// hang indefinitely on a stuck audio session rather than rejecting, leaving
+// the UI stuck on "Preparing mic…" forever with no diagnostic. Bound it so a
+// hang becomes a specific, catchable error instead.
+const MIC_SETUP_TIMEOUT_MS = 8000
+
 // Record from the microphone until `stop()` is called, sampling the pitch on
 // every animation frame. `onLevel(level)` is invoked each frame with the
 // current RMS (0..1) so the UI can drive a live meter. stop() resolves with
 // the F0 series plus capture diagnostics { contour, frames, voiced, peak }.
 export async function recordPitchContour(onLevel, opts = {}) {
   const ctx = primeAudio() || new AudioCtx()
-  if (ctx.state === 'suspended') await ctx.resume()
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  if (ctx.state === 'suspended') {
+    await withTimeout(ctx.resume(), MIC_SETUP_TIMEOUT_MS, `audio context stuck resuming (state: ${ctx.state})`)
+  }
+  const stream = await withTimeout(
+    navigator.mediaDevices.getUserMedia({ audio: true }),
+    MIC_SETUP_TIMEOUT_MS,
+    `mic did not respond (context state: ${ctx.state})`
+  )
   const source = ctx.createMediaStreamSource(stream)
   const analyser = ctx.createAnalyser()
   analyser.fftSize = SAMPLE_FRAMES
