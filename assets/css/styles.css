@@ -169,6 +169,9 @@ main {
 }
 .btn.icon.record { background: var(--accent); color: #fff; }
 .btn.icon.record.active { background: var(--bad); box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.3); }
+/* Mic is actually capturing (past "Preparing…"), distinct from .active so
+   it's obvious when the mic has gone from starting up to really listening. */
+.btn.icon.record.ready { background: var(--good); box-shadow: 0 0 0 4px rgba(46, 204, 113, 0.3); }
 /* Back and Next share one row under the record button, each taking half. */
 .controls.nav { gap: 0.6rem; }
 .controls.nav .btn { flex: 1; }
@@ -311,6 +314,8 @@ footer p { margin: 0.25rem 0; }
 .score-panel:empty { display: none; }
 .score-panel.error { color: var(--bad); }
 .score-panel.info { color: var(--muted); }
+.score-panel.ready { color: var(--good); }
+.score-panel.ready .best-note { color: var(--good); }
 
 .wordlist {
   background: var(--panel);
@@ -342,7 +347,7 @@ footer p { margin: 0.25rem 0; }
   font-size: 1rem;
   cursor: pointer;
 }
-.wl-item.current { border-color: var(--accent); }
+.wl-item.current { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
 .wl-pct { font-weight: 600; font-size: 0.85rem; }
 .wl-item.good .wl-pct { color: var(--good); }
 .wl-item.bad .wl-pct { color: var(--bad); }

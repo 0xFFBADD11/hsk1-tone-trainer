@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { shuffle, createQuiz } from '../assets/js/quiz.js'
+import { shuffle, createQuiz, priorityOrder } from '../assets/js/quiz.js'
 
 const words = [
   { hanzi: 'a', pinyin: 'a', tones: [1], en: 'a' },
@@ -88,4 +88,36 @@ test('removeWord on an absent hanzi is a no-op', () => {
   const quiz = createQuiz(words, () => 0)
   quiz.removeWord('nope')
   assert.equal(quiz.progress().total, 3)
+})
+
+test('priorityOrder puts never-attempted words before attempted ones', () => {
+  const order = priorityOrder(words, { a: 0.9 }, () => 0)
+  assert.deepEqual(order.map((w) => w.hanzi).slice(-1), ['a'])
+  assert.deepEqual(new Set(order.slice(0, 2).map((w) => w.hanzi)), new Set(['b', 'c']))
+})
+
+test('priorityOrder sorts attempted words worst-score-first', () => {
+  const order = priorityOrder(words, { a: 0.9, b: 0.2, c: 0.5 }, () => 0)
+  assert.deepEqual(order.map((w) => w.hanzi), ['b', 'c', 'a'])
+})
+
+test('priorityOrder with no scores at all is equivalent to a full shuffle', () => {
+  const order = priorityOrder(words, {}, () => 0)
+  assert.deepEqual(order, shuffle(words, () => 0))
+})
+
+test('priorityOrder does not mutate its inputs', () => {
+  const wordsCopy = words.slice()
+  const scores = { a: 0.9, b: 0.2 }
+  priorityOrder(words, scores, () => 0)
+  assert.deepEqual(words, wordsCopy)
+  assert.deepEqual(scores, { a: 0.9, b: 0.2 })
+})
+
+test('createQuiz accepts an orderOverride instead of shuffling', () => {
+  const custom = [words[2], words[0], words[1]] // [c, a, b]
+  const quiz = createQuiz(words, () => 0, {}, custom)
+  assert.equal(quiz.current().hanzi, 'c')
+  quiz.advance()
+  assert.equal(quiz.current().hanzi, 'a')
 })
