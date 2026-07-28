@@ -21,20 +21,11 @@ function pickChineseVoice() {
   return pool.slice().sort((a, b) => voiceRank(b) - voiceRank(a))[0] || null
 }
 
-// How long to wait before reporting the synthesizer's internal state, if
-// nothing else (onstart/onend/onerror) already told us something — long
-// enough for a short word's audio to plausibly have started and finished.
-const STATE_CHECK_MS = 1500
-
 // Kept alive so the in-flight utterance can't be garbage-collected before the
 // engine finishes speaking it. SpeechSynthesisUtterance is a classic trap: a
 // local variable going out of scope when the calling function returns is not
 // enough to guarantee it survives — event listeners attached to it don't
-// necessarily count as a keep-alive reference in every engine either. Losing
-// it mid-flight looks exactly like what was diagnosed here: speak() is
-// called, but onstart/onend never fire and speaking/pending both read false
-// shortly after, as if the utterance was dropped before ever being
-// processed, with no error.
+// necessarily count as a keep-alive reference in every engine either.
 let currentUtterance = null
 
 function utterAndSpeak(text, rate, onStatus) {
@@ -51,36 +42,17 @@ function utterAndSpeak(text, rate, onStatus) {
   const voice = pickChineseVoice()
   if (voice) utter.voice = voice
 
-  // Diagnostic only — reports what the synthesizer itself thinks happened,
-  // since "speak() didn't error" turns out not to mean "sound came out".
-  // onstart/onend tell us whether the engine ever actually began/finished
-  // this utterance; synth.speaking/pending/paused are its state a moment
-  // later. Skipped if onerror already reported something more specific.
-  let settled = false
-  let started = false
-  let ended = false
-  utter.onstart = () => { started = true }
   utter.onend = () => {
-    ended = true
     // Release the keep-alive reference once this utterance is genuinely
     // done, but only if a newer speak() call hasn't already replaced it.
     if (currentUtterance === utter) currentUtterance = null
   }
-  setTimeout(() => {
-    if (settled || !onStatus) return
-    onStatus(
-      `Diag: voice=${voice ? voice.name : '(default)'} started=${started} ended=${ended} ` +
-      `speaking=${synth.speaking} pending=${synth.pending} paused=${synth.paused}`
-    )
-  }, STATE_CHECK_MS)
-
   utter.onerror = (ev) => {
     if (currentUtterance === utter) currentUtterance = null
     // "canceled"/"interrupted" fire whenever our own cancel() above cuts off
     // a still-playing previous utterance (e.g. tapping play again quickly) —
     // routine, not a failure worth reporting.
     if (ev.error === 'canceled' || ev.error === 'interrupted') return
-    settled = true
     if (onStatus) onStatus(`Speech synthesis error: ${ev.error}`)
   }
   synth.speak(utter)

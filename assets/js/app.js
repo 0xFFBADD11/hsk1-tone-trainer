@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728p'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728p'
-import { el, clear } from './dom.js?v=20260728p'
-import { speak, speechSupported } from './speech.js?v=20260728p'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728p'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728p'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260728p'
-import { toWhisperInput } from './audio.js?v=20260728p'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728p'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728p'
-import { generateExample } from './example.js?v=20260728p'
-import { translateEnglish } from './translate.js?v=20260728p'
+import { HSK1 } from '../data/hsk1.js?v=20260728q'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728q'
+import { el, clear } from './dom.js?v=20260728q'
+import { speak, speechSupported } from './speech.js?v=20260728q'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728q'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728q'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260728q'
+import { toWhisperInput } from './audio.js?v=20260728q'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728q'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728q'
+import { generateExample } from './example.js?v=20260728q'
+import { translateEnglish } from './translate.js?v=20260728q'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728p · translate-english-to-add-word'
+const BUILD = '20260728q · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -413,6 +413,11 @@ function heardSpans(text, matchStart, matchLen, expectedChars) {
   return spans
 }
 
+// Percent of the whole word pool (not just this session) mastered so far.
+function masteredPercent() {
+  return words.length ? Math.round((mastered.size / words.length) * 100) : 0
+}
+
 // Fill the top bar: prominent word count and a green mastered badge.
 function fillTopbar(node) {
   if (!node) return
@@ -420,7 +425,7 @@ function fillTopbar(node) {
   const { position, total } = quiz.progress()
   node.append(el('span', { class: 'progress-count', text: `Word ${position} / ${total}` }))
   if (mastered.size) {
-    node.append(el('span', { class: 'mastered-badge', text: `✓ ${mastered.size} mastered` }))
+    node.append(el('span', { class: 'mastered-badge', text: `✓ ${mastered.size} mastered (${masteredPercent()}%)` }))
   }
 }
 
@@ -1101,7 +1106,7 @@ function renderSummary() {
     el('div', { class: 'card summary' }, [
       el('h2', { text: 'Session complete' }),
       el('p', { text: `${count} words practiced` }),
-      el('p', { class: 'pass-badge', text: `✓ ${mastered.size} tones mastered` }),
+      el('p', { class: 'pass-badge', text: `✓ ${mastered.size} tones mastered (${masteredPercent()}% of ${words.length} words)` }),
       el('p', { class: 'score', text: `Average tone accuracy: ${scorePercent(average)}%` }),
       el('div', { class: 'controls' }, [
         el('button', { class: 'btn', text: 'Practice again', onclick: practiceAgain }),
