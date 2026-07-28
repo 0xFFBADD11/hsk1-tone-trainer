@@ -165,17 +165,15 @@ export async function recordPitchContour(onLevel, opts = {}) {
       processor.disconnect()
       processor.onaudioprocess = null
     }
-    // Keep the primed context open for reuse (only close a throwaway one),
-    // but suspend it between recordings rather than leaving it running
-    // indefinitely. iOS ties the page's audio session category to whether an
-    // AudioContext that has touched the microphone is active; leaving it
-    // running for the whole session is a known cause of other audio (like
-    // speechSynthesis playback) going silent or later mic captures coming
-    // back empty. recordPitchContour() already resumes a suspended context
-    // from inside the next gesture, so this doesn't add any user-visible lag.
+    // Keep the primed context open for reuse; only close a throwaway one.
+    // (A prior attempt at suspending it between recordings, to try to work
+    // around a suspected iOS audio-session issue, was reverted — resuming a
+    // suspended context with an existing mic-touching node graph is itself a
+    // known flaky spot on iOS, and it's suspected of causing recordings to
+    // hang at "Preparing mic…" instead of the milder issue it was meant to
+    // fix. Unverified on real hardware either way; see git history.)
     const sampleRate = ctx.sampleRate
     if (ctx !== primedCtx) await ctx.close()
-    else await ctx.suspend()
     return { contour, frames, voiced, peak, audio: audioChunks, sampleRate }
   }
 
