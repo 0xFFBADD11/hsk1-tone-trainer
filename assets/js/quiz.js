@@ -14,8 +14,28 @@ export function shuffle(items, rand = Math.random) {
   return out
 }
 
-export function createQuiz(words, rand = Math.random, initialScores = {}) {
-  const order = shuffle(words, rand)
+// Order words by practice priority, for continuing past a full pass: never-
+// attempted words first (shuffled among themselves, for variety), then
+// attempted words worst-score-first — so a new round focuses on what hasn't
+// been tried yet and what needs the most work, instead of a fresh random
+// shuffle that could just as easily start with an already-mastered word.
+// `scores` is a plain object keyed by hanzi (e.g. from Quiz.snapshot()).
+export function priorityOrder(words, scores, rand = Math.random) {
+  const unattempted = []
+  const attempted = []
+  for (const word of words) {
+    if (scores[word.hanzi] === undefined) unattempted.push(word)
+    else attempted.push(word)
+  }
+  attempted.sort((a, b) => scores[a.hanzi] - scores[b.hanzi])
+  return [...shuffle(unattempted, rand), ...attempted]
+}
+
+// `orderOverride`, if given, is used as the play order as-is instead of
+// shuffling `words` (e.g. a priorityOrder() result) — for continuing past a
+// full pass in practice-priority order rather than a fresh random shuffle.
+export function createQuiz(words, rand = Math.random, initialScores = {}, orderOverride = null) {
+  const order = orderOverride || shuffle(words, rand)
   let index = 0
   // Best 0..1 score per attempted word, keyed by hanzi (not position) so it
   // survives reshuffles and can be seeded from — and snapshotted back into —

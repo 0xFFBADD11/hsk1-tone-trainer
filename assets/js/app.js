@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728n'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728n'
-import { el, clear } from './dom.js?v=20260728n'
-import { speak, speechSupported } from './speech.js?v=20260728n'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728n'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728n'
-import { createQuiz } from './quiz.js?v=20260728n'
-import { toWhisperInput } from './audio.js?v=20260728n'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728n'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728n'
-import { generateExample } from './example.js?v=20260728n'
-import { translateEnglish } from './translate.js?v=20260728n'
+import { HSK1 } from '../data/hsk1.js?v=20260728p'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728p'
+import { el, clear } from './dom.js?v=20260728p'
+import { speak, speechSupported } from './speech.js?v=20260728p'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728p'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728p'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260728p'
+import { toWhisperInput } from './audio.js?v=20260728p'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728p'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728p'
+import { generateExample } from './example.js?v=20260728p'
+import { translateEnglish } from './translate.js?v=20260728p'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728n · translate-english-to-add-word'
+const BUILD = '20260728p · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -88,7 +88,9 @@ let words = [...HSK1, ...customWords]
 // Cross-session practice progress (best score + mastered status per hanzi),
 // so returning to the app continues instead of starting over.
 const progress = loadProgress()
-const quiz = createQuiz(words, Math.random, progress.scores)
+// Reassigned by practiceAgain() when continuing past a full pass, so keep
+// this `let` — other functions read it fresh via closure, not by value.
+let quiz = createQuiz(words, Math.random, progress.scores)
 // Hanzi pronounced acceptably (best attempt counts), restored from persisted
 // progress and updated as the learner scores new words.
 const mastered = new Set(progress.mastered)
@@ -598,6 +600,33 @@ async function fillSentenceHanzi(word) {
   for (const span of speakableSpans(currentExample.hanzi, word.hanzi)) row.append(span)
 }
 
+// Icons for the two record buttons: plain mic when idle/starting up, a red
+// recording dot once the mic is actually capturing (a universal "recording"
+// indicator, paired with the button turning green — a different signal
+// channel, so it stays clear even if one is missed).
+const MIC_IDLE_ICON = '🎤'
+const MIC_READY_ICON = '🔴'
+
+// Pressed, mic not confirmed live yet (still "Preparing mic…").
+function setMicPreparing(btn) {
+  btn.classList.remove('ready')
+  btn.classList.add('active')
+  btn.textContent = MIC_IDLE_ICON
+}
+
+// Mic confirmed live and actually capturing audio.
+function setMicReady(btn) {
+  btn.classList.remove('active')
+  btn.classList.add('ready')
+  btn.textContent = MIC_READY_ICON
+}
+
+// Not recording (released, errored, or never started).
+function setMicIdle(btn) {
+  btn.classList.remove('active', 'ready')
+  btn.textContent = MIC_IDLE_ICON
+}
+
 function wireRecordButton(word) {
   const btn = document.getElementById('record-btn')
   let pressActive = false
@@ -615,7 +644,7 @@ function wireRecordButton(word) {
     // Must run synchronously inside the gesture, before any await, or iOS
     // Safari refuses to start the audio context.
     primeAudio()
-    btn.classList.add('active')
+    setMicPreparing(btn)
     // Mic startup can lag; don't claim "Recording" until it's actually live.
     setFeedback('Preparing mic…', 'info')
     try {
@@ -627,13 +656,14 @@ function wireRecordButton(word) {
         recorder = null
         setMeter(0)
         clearFeedback()
-        btn.classList.remove('active')
+        setMicIdle(btn)
         return
       }
-      setFeedback('Recording… release to score', 'info')
+      setMicReady(btn)
+      setFeedback('Recording… release to score', 'ready')
     } catch (e) {
       recorder = null
-      btn.classList.remove('active')
+      setMicIdle(btn)
       setMeter(0)
       setFeedback(`${MIC_HELP} (${e.message})`, 'error')
     }
@@ -646,10 +676,10 @@ function wireRecordButton(word) {
     // already added must still come off — otherwise the button is stuck
     // "active" until the next successful press.
     if (!recorder) {
-      btn.classList.remove('active')
+      setMicIdle(btn)
       return
     }
-    btn.classList.remove('active')
+    setMicIdle(btn)
     const capture = await recorder.stop()
     recorder = null
     setMeter(0)
@@ -680,7 +710,7 @@ function wireSentenceRecord(word) {
     pressActive = true
     if (ev.pointerId !== undefined && btn.setPointerCapture) btn.setPointerCapture(ev.pointerId)
     primeAudio()
-    btn.classList.add('active')
+    setMicPreparing(btn)
     setSentencePron('Preparing mic…')
     try {
       sentRec = await recordPitchContour((l) => setMeter(l, 'sentence-meter-bar'), { captureAudio: true })
@@ -689,13 +719,14 @@ function wireSentenceRecord(word) {
         sentRec = null
         setMeter(0, 'sentence-meter-bar')
         setSentencePron('')
-        btn.classList.remove('active')
+        setMicIdle(btn)
         return
       }
-      setSentencePron('Recording… read the whole sentence, then release')
+      setMicReady(btn)
+      setSentencePron('Recording… read the whole sentence, then release', 'ready')
     } catch (e) {
       sentRec = null
-      btn.classList.remove('active')
+      setMicIdle(btn)
       setMeter(0, 'sentence-meter-bar')
       setSentencePron(`${MIC_HELP} (${e.message})`)
     }
@@ -706,10 +737,10 @@ function wireSentenceRecord(word) {
     // See wireRecordButton's stop() for why this must run even with no
     // sentRec yet: a quick release can beat the mic's async startup.
     if (!sentRec) {
-      btn.classList.remove('active')
+      setMicIdle(btn)
       return
     }
-    btn.classList.remove('active')
+    setMicIdle(btn)
     const capture = await sentRec.stop()
     sentRec = null
     setMeter(0, 'sentence-meter-bar')
@@ -884,11 +915,11 @@ function pronStatus(closeness) {
   return { cls: 'bad', label: '❌ Not heard' }
 }
 
-function setSentencePron(text) {
+function setSentencePron(text, kind) {
   const box = document.getElementById('pron-result')
   if (!box) return
   clear(box)
-  box.className = 'score-panel shown'
+  box.className = `score-panel shown ${kind || ''}`.trim()
   box.append(el('p', { class: 'best-note', text }))
 }
 
@@ -1051,6 +1082,18 @@ function jumpTo(index) {
   renderWord()
 }
 
+// Start a new round after a full pass, ordered by practice priority (never-
+// attempted words first, then attempted words worst-score-first) rather
+// than a fresh random shuffle — so continuing focuses on what needs the
+// most work instead of just as likely starting with an already-mastered
+// word. Scores/mastered carry over (no reload, no reset); only the order
+// and position are new.
+function practiceAgain() {
+  const order = priorityOrder(words, quiz.snapshot(), Math.random)
+  quiz = createQuiz(words, Math.random, quiz.snapshot(), order)
+  renderWord()
+}
+
 function renderSummary() {
   const { count, average } = quiz.summary()
   clear(app)
@@ -1061,7 +1104,7 @@ function renderSummary() {
       el('p', { class: 'pass-badge', text: `✓ ${mastered.size} tones mastered` }),
       el('p', { class: 'score', text: `Average tone accuracy: ${scorePercent(average)}%` }),
       el('div', { class: 'controls' }, [
-        el('button', { class: 'btn', text: 'Practice again', onclick: () => window.location.reload() }),
+        el('button', { class: 'btn', text: 'Practice again', onclick: practiceAgain }),
         el('button', { class: 'btn ghost', text: '➕ Add words', onclick: () => renderAddWord() })
       ])
     ])
