@@ -21,60 +21,50 @@ function pickChineseVoice() {
   return pool.slice().sort((a, b) => voiceRank(b) - voiceRank(a))[0] || null
 }
 
-// If `getVoices()` is empty, wait this long for `voiceschanged` before giving
-// up and trying anyway — iOS Safari has a known history of that event
-// sometimes never firing, which would otherwise leave speak() waiting
-// forever with no sound and no error.
-const VOICES_TIMEOUT_MS = 2000
-
 function utterAndSpeak(text, rate, onStatus) {
   const synth = window.speechSynthesis
   const utter = new SpeechSynthesisUtterance(text)
   utter.lang = 'zh-CN'
   utter.rate = rate
+  // getVoices() may still be empty here (it can take a moment to populate,
+  // and on some devices the voiceschanged event that would tell us it's
+  // ready never fires at all). That's fine — utter.lang alone is usually
+  // enough for the platform to pick a reasonable default. What matters more
+  // is not waiting: see the note in speak() below.
   const voice = pickChineseVoice()
   if (voice) utter.voice = voice
-  else if (onStatus) onStatus('No Chinese voice found on this device — using its default voice.')
-  utter.onerror = (ev) => { if (onStatus) onStatus(`Speech synthesis error: ${ev.error}`) }
+  utter.onerror = (ev) => {
+    // "canceled"/"interrupted" fire whenever our own cancel() above cuts off
+    // a still-playing previous utterance (e.g. tapping play again quickly) —
+    // routine, not a failure worth reporting.
+    if (ev.error === 'canceled' || ev.error === 'interrupted') return
+    if (onStatus) onStatus(`Speech synthesis error: ${ev.error}`)
+  }
   synth.speak(utter)
   // Chrome sometimes leaves the synthesizer paused after cancel()/on load, so
   // the utterance queues but never plays; resume() kicks it off.
   synth.resume()
 }
 
-// Speak `text` in Mandarin at `rate` (1 = normal; lower is slower). If no voice
-// list is available yet, wait once for `voiceschanged` (bounded — see
-// VOICES_TIMEOUT_MS); otherwise speak now, falling back to the browser's
-// default zh-CN voice when no Chinese voice is installed. `onStatus`, if
-// given, is called with a short diagnostic string for anything unusual (not
-// on the ordinary success path) — e.g. wire it to a visible status line.
+// Speak `text` in Mandarin at `rate` (1 = normal; lower is slower), falling
+// back to the platform's default zh-CN voice when no preferred Chinese voice
+// is installed/loaded yet. `onStatus`, if given, is called with a short
+// diagnostic string for anything unusual (not on the ordinary success path)
+// — e.g. wire it to a visible status line.
+//
+// Always calls speechSynthesis.speak() synchronously, in the same tick as
+// the call to speak() itself — never after an await, a timeout, or a
+// voiceschanged event. iOS requires speak() to run inside the original user
+// gesture, exactly like this codebase's AudioContext handling already has to
+// (see pitch.js); calling it from an async callback doesn't error, it just
+// produces no sound, which is far more confusing to debug than picking a
+// worse (or no) voice on an occasional first call before the voice list has
+// loaded.
 export function speak(text, rate = 0.85, onStatus) {
   if (!speechSupported()) {
     if (onStatus) onStatus('Speech synthesis not supported in this browser.')
     return
   }
-  const synth = window.speechSynthesis
-  synth.cancel()
-
-  if (synth.getVoices().length > 0) {
-    utterAndSpeak(text, rate, onStatus)
-    return
-  }
-
-  let settled = false
-  const timer = setTimeout(() => {
-    if (settled) return
-    settled = true
-    synth.removeEventListener('voiceschanged', onVoicesChanged)
-    if (onStatus) onStatus('Voice list never loaded — trying the default voice anyway.')
-    utterAndSpeak(text, rate, onStatus)
-  }, VOICES_TIMEOUT_MS)
-  function onVoicesChanged() {
-    if (settled) return
-    settled = true
-    clearTimeout(timer)
-    synth.removeEventListener('voiceschanged', onVoicesChanged)
-    utterAndSpeak(text, rate, onStatus)
-  }
-  synth.addEventListener('voiceschanged', onVoicesChanged)
+  window.speechSynthesis.cancel()
+  utterAndSpeak(text, rate, onStatus)
 }

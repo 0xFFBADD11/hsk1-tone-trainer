@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728h'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728h'
-import { el, clear } from './dom.js?v=20260728h'
-import { speak, speechSupported } from './speech.js?v=20260728h'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728h'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728h'
-import { createQuiz } from './quiz.js?v=20260728h'
-import { toWhisperInput } from './audio.js?v=20260728h'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728h'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728h'
-import { generateExample } from './example.js?v=20260728h'
-import { translateEnglish } from './translate.js?v=20260728h'
+import { HSK1 } from '../data/hsk1.js?v=20260728i'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728i'
+import { el, clear } from './dom.js?v=20260728i'
+import { speak, speechSupported } from './speech.js?v=20260728i'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728i'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728i'
+import { createQuiz } from './quiz.js?v=20260728i'
+import { toWhisperInput } from './audio.js?v=20260728i'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728i'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728i'
+import { generateExample } from './example.js?v=20260728i'
+import { translateEnglish } from './translate.js?v=20260728i'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728h · translate-english-to-add-word'
+const BUILD = '20260728i · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -165,10 +165,14 @@ function loadSlowPref() {
   }
 }
 
-// Speak, honoring the slow toggle. Use this for all playback. Anything
-// unusual (no voice loaded yet, no Chinese voice installed, a synthesis
-// error) surfaces in the footer status line instead of failing silently.
+// Speak, honoring the slow toggle. Use this for all playback. Sets an
+// immediate status before doing anything else — if a tap never produces
+// even this, the click handler itself isn't running (a DOM/CSS issue), as
+// opposed to speak() running but producing no sound. Anything unusual after
+// that (no Chinese voice installed, a synthesis error) also surfaces here
+// instead of failing silently.
 function say(text) {
+  setPronStatus(`Speaking “${text}”…`)
   speak(text, slowMode ? SLOW_RATE : NORMAL_RATE, setPronStatus)
 }
 
