@@ -1,14 +1,16 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260702a'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260702a'
-import { el, clear } from './dom.js?v=20260702a'
-import { speak, speechSupported } from './speech.js?v=20260702a'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260702a'
-import { scoreWord, scoreWordInSentence, TONE_NAMES } from './tone.js?v=20260702a'
-import { createQuiz } from './quiz.js?v=20260702a'
-import { toWhisperInput } from './audio.js?v=20260702a'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260702a'
+import { HSK1 } from '../data/hsk1.js?v=20260728a'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728a'
+import { el, clear } from './dom.js?v=20260728a'
+import { speak, speechSupported } from './speech.js?v=20260728a'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728a'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728a'
+import { createQuiz } from './quiz.js?v=20260728a'
+import { toWhisperInput } from './audio.js?v=20260728a'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728a'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728a'
+import { generateExample } from './example.js?v=20260728a'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -70,15 +72,75 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260702a · sentence-tone-and-ring'
+const BUILD = '20260728a · custom-words-and-progress-persistence'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
 const app = document.getElementById('app')
-const quiz = createQuiz(HSK1)
-// Hanzi of words pronounced acceptably this session (best attempt counts).
-const mastered = new Set()
+
+// Words the learner has added, persisted alongside HSK1. `words` is the
+// combined pool the quiz draws from; both are kept in sync by
+// addCustomWord/removeCustomWord below.
+let customWords = loadCustomWords()
+let words = [...HSK1, ...customWords]
+
+// Cross-session practice progress (best score + mastered status per hanzi),
+// so returning to the app continues instead of starting over.
+const progress = loadProgress()
+const quiz = createQuiz(words, Math.random, progress.scores)
+// Hanzi pronounced acceptably (best attempt counts), restored from persisted
+// progress and updated as the learner scores new words.
+const mastered = new Set(progress.mastered)
 let recorder = null
+
+function persistProgress() {
+  saveProgress({ scores: quiz.snapshot(), mastered: [...mastered] })
+}
+
+const HAN_RE = /[一-鿿]/
+
+// Validate a candidate custom word without adding it yet — the caller shows
+// it back to the learner (hanzi, interpreted tones, a generated example) so
+// a mistyped pinyin gets caught before it's saved. Returns { error } or
+// { word }.
+function validateCustomWord({ hanzi, pinyin, en }) {
+  hanzi = (hanzi || '').trim()
+  pinyin = (pinyin || '').trim().replace(/\s+/g, ' ')
+  en = (en || '').trim()
+  if (!hanzi || !HAN_RE.test(hanzi)) return { error: 'Enter at least one Chinese character.' }
+  if (!pinyin) return { error: 'Enter the pinyin, with tone marks (e.g. nǐ hǎo).' }
+  if (!en) return { error: 'Enter an English translation.' }
+  if (words.some((w) => w.hanzi === hanzi)) return { error: `“${hanzi}” is already in the word list.` }
+  const tones = parseTonesFromPinyin(pinyin)
+  if (tones.length === 0) return { error: 'Could not read any syllables from that pinyin.' }
+  return { word: { hanzi, pinyin, tones, en, custom: true } }
+}
+
+// Commit an already-validated (and learner-confirmed) word to the live pool,
+// quiz, and storage.
+function commitCustomWord(word) {
+  customWords = [...customWords, word]
+  words = [...words, word]
+  saveCustomWords(customWords)
+  quiz.addWord(word)
+}
+
+// Remove a previously added custom word from the pool, quiz, and storage.
+function removeCustomWord(hanzi) {
+  customWords = customWords.filter((w) => w.hanzi !== hanzi)
+  words = words.filter((w) => w.hanzi !== hanzi)
+  saveCustomWords(customWords)
+  quiz.removeWord(hanzi)
+  mastered.delete(hanzi)
+  persistProgress()
+}
+
+function resetProgress() {
+  const ok = window.confirm('Reset all practice scores and mastered words? Your added words are kept. This cannot be undone.')
+  if (!ok) return
+  clearProgress()
+  window.location.reload()
+}
 
 // Opt-in on-device pronunciation check (Whisper). Off unless the user enables it.
 let pronounceEnabled = loadPronPref()
@@ -157,6 +219,7 @@ function renderSettings() {
       onclick: () => togglePronunciation()
     }))
   }
+  children.push(el('button', { class: 'chip', text: '➕ Add word', onclick: () => renderAddWord() }))
   return el('div', { class: 'settings' }, children)
 }
 
@@ -382,12 +445,22 @@ function showBest(best) {
 // record/play can use it without rebuilding their listeners).
 let currentExample = null
 
-// Pick a random example sentence for a word (data may be one object or an
-// array), optionally avoiding the current one.
+// Sentences available for a word: HSK1's hand-written set if it has one,
+// otherwise a single generated sentence for a custom (learner-added) word so
+// it's still readable/scoreable in the sentence panel. Always an array (or
+// null for an HSK1-shaped word somehow missing both, which shouldn't happen).
+function examplePool(word) {
+  const built = HSK1_EXAMPLES[word.hanzi]
+  if (built) return Array.isArray(built) ? built : [built]
+  if (word.custom) return [generateExample(word)]
+  return null
+}
+
+// Pick a random example sentence for a word, optionally avoiding the current
+// one.
 function pickExample(word, avoid) {
-  const ex = HSK1_EXAMPLES[word.hanzi]
-  if (!ex) return null
-  const list = Array.isArray(ex) ? ex : [ex]
+  const list = examplePool(word)
+  if (!list) return null
   if (list.length === 1) return list[0]
   let pick = list[Math.floor(Math.random() * list.length)]
   while (avoid && pick === avoid) pick = list[Math.floor(Math.random() * list.length)]
@@ -430,7 +503,7 @@ function renderWord() {
   if (!word) return renderSummary()
   currentExample = pickExample(word)
   const ex = currentExample
-  const pool = HSK1_EXAMPLES[word.hanzi]
+  const pool = examplePool(word)
   const canShuffle = Array.isArray(pool) && pool.length > 1
 
   clear(app)
@@ -742,6 +815,7 @@ function showResult(word, result, tonePercent) {
   const tonePassed = tonePercent >= ACCEPT_PERCENT
   quiz.setScore(result.overall)
   if (tonePassed) mastered.add(word.hanzi)
+  persistProgress()
 
   const box = document.getElementById('tone-result')
   if (!box) return
@@ -939,7 +1013,136 @@ function renderSummary() {
       el('p', { text: `${count} words practiced` }),
       el('p', { class: 'pass-badge', text: `✓ ${mastered.size} tones mastered` }),
       el('p', { class: 'score', text: `Average tone accuracy: ${scorePercent(average)}%` }),
-      el('button', { class: 'btn', text: 'Practice again', onclick: () => window.location.reload() })
+      el('div', { class: 'controls' }, [
+        el('button', { class: 'btn', text: 'Practice again', onclick: () => window.location.reload() }),
+        el('button', { class: 'btn ghost', text: '➕ Add words', onclick: () => renderAddWord() })
+      ])
+    ])
+  )
+}
+
+// Where "back" goes from the add-word view depends on whether the quiz was
+// already finished (adding a word can un-finish it — the new word extends
+// the queue, so isDone() may now be false again).
+function backFromAddWord() {
+  if (quiz.isDone()) renderSummary()
+  else renderWord()
+}
+
+// Best-effort tone-marked pinyin for a hanzi string, via the same lazily
+// loaded pinyin-pro used for example sentences. Empty string if unavailable
+// (offline, blocked CDN) — the pinyin field is still typeable by hand.
+async function autofillPinyin(hanzi) {
+  const arr = await toPinyinArray(hanzi)
+  return arr.join(' ')
+}
+
+// Show a validated candidate word back to the learner — hanzi, the tones
+// read off the pinyin, and a generated example sentence — before it's
+// actually saved, so a mistyped tone mark or wrong pinyin gets caught here
+// rather than silently becoming a quiz question.
+function renderConfirmWord(word) {
+  clear(app)
+  const ex = generateExample(word)
+  const syllables = word.pinyin.trim().split(/[\s']+/).filter(Boolean)
+  const toneRows = word.tones.map((t, i) =>
+    el('li', { text: `${syllables[i] || '?'} — ${TONE_NAMES[t]}` })
+  )
+
+  app.append(
+    el('div', { class: 'card' }, [
+      el('h2', { text: 'Does this look right?' }),
+      el('div', {
+        class: 'hanzi word-speak',
+        title: `${word.pinyin} — ${word.en}`,
+        text: word.hanzi,
+        onclick: () => say(word.hanzi)
+      }),
+      el('div', { class: 'pinyin', text: word.pinyin }),
+      el('div', { class: 'english', text: word.en }),
+      el('button', { class: 'btn ghost small', text: '▶️ Hear it', onclick: () => say(word.hanzi) }),
+      el('ul', { class: 'syllables confirm-tones' }, toneRows),
+      el('div', { class: 'sub-sep' }),
+      el('p', { class: 'field-label', text: 'Example sentence (auto-generated)' }),
+      el('div', { class: 'ex-hanzi', text: ex.hanzi }),
+      el('div', { class: 'ex-pinyin', text: ex.pinyin }),
+      el('div', { class: 'ex-en', text: ex.en }),
+      el('div', { class: 'controls' }, [
+        el('button', { class: 'btn', text: '✅ Looks right — add it', onclick: () => { commitCustomWord(word); renderAddWord() } }),
+        el('button', { class: 'btn ghost', text: '✏️ Edit', onclick: () => renderAddWord(word) })
+      ])
+    ])
+  )
+}
+
+// A form to add a custom word to the quiz pool, plus a manager for
+// previously added ones (with delete, since typos should be fixable).
+// `prefill` re-populates the fields when returning here to edit a candidate
+// from the confirmation step.
+function renderAddWord(prefill = {}) {
+  clear(app)
+
+  const errorEl = el('p', { class: 'form-error' })
+  const hanziInput = el('input', { type: 'text', class: 'field-input', placeholder: '你好', autocomplete: 'off', value: prefill.hanzi || '' })
+  const pinyinInput = el('input', { type: 'text', class: 'field-input', placeholder: 'nǐ hǎo', autocomplete: 'off', value: prefill.pinyin || '' })
+  const enInput = el('input', { type: 'text', class: 'field-input', placeholder: 'hello', autocomplete: 'off', value: prefill.en || '' })
+
+  async function autofill() {
+    const hanzi = hanziInput.value.trim()
+    if (!hanzi) return
+    const py = await autofillPinyin(hanzi)
+    if (py) pinyinInput.value = py
+  }
+
+  function submit(ev) {
+    ev.preventDefault()
+    const result = validateCustomWord({ hanzi: hanziInput.value, pinyin: pinyinInput.value, en: enInput.value })
+    if (result.error) {
+      errorEl.textContent = result.error
+      return
+    }
+    renderConfirmWord(result.word)
+  }
+
+  const manageItems = customWords.length === 0
+    ? [el('p', { class: 'wordlist-empty', text: 'Words you add appear here.' })]
+    : customWords.map((w) => el('div', { class: 'manage-item' }, [
+      el('span', { class: 'manage-hanzi', text: w.hanzi }),
+      el('span', { class: 'manage-pinyin', text: w.pinyin }),
+      el('span', { class: 'manage-en', text: w.en }),
+      el('button', {
+        class: 'btn ghost small',
+        text: '✕',
+        title: `Remove ${w.hanzi}`,
+        'aria-label': `Remove ${w.hanzi}`,
+        onclick: () => { removeCustomWord(w.hanzi); renderAddWord() }
+      })
+    ]))
+
+  app.append(
+    el('form', { class: 'card form', onsubmit: submit }, [
+      el('h2', { text: 'Add a word' }),
+      el('label', { class: 'field-label', text: 'Chinese' }),
+      hanziInput,
+      el('div', { class: 'field-row' }, [
+        el('label', { class: 'field-label', text: 'Pinyin — tone marks, syllables separated by spaces' }),
+        el('button', { type: 'button', class: 'btn ghost small', text: 'Auto-fill', onclick: autofill })
+      ]),
+      pinyinInput,
+      el('label', { class: 'field-label', text: 'English' }),
+      enInput,
+      errorEl,
+      el('div', { class: 'controls' }, [
+        el('button', { type: 'submit', class: 'btn', text: 'Add word' }),
+        el('button', { type: 'button', class: 'btn ghost', text: '← Back to practice', onclick: backFromAddWord })
+      ])
+    ]),
+    el('div', { class: 'card word-manage' }, [
+      el('h3', { text: 'Your added words' }),
+      ...manageItems
+    ]),
+    el('div', { class: 'danger-zone' }, [
+      el('button', { class: 'btn ghost small danger', text: '↺ Reset practice progress', onclick: resetProgress })
     ])
   )
 }

@@ -233,6 +233,39 @@ function clamp01(v) {
   return v
 }
 
+// Map a combining diacritic (present after Unicode NFD decomposition) to the
+// tone it marks, matching how HSK1's own data encodes tone: macron/acute/
+// caron/grave for 1-4, no mark at all for neutral (5) — e.g. the "de" in
+// 我的 or the "zi" in 桌子.
+const TONE_MARK_CODES = {
+  '̄': 1, // macron  (ā ē ī ō ū ǖ)
+  '́': 2, // acute   (á é í ó ú ǘ)
+  '̌': 3, // caron   (ǎ ě ǐ ǒ ǔ ǚ)
+  '̀': 4 // grave   (à è ì ò ù ǜ)
+}
+
+// Read the tone (1-5) off one tone-marked pinyin syllable.
+export function toneFromSyllable(syllable) {
+  const decomposed = (syllable || '').normalize('NFD')
+  for (const ch of decomposed) {
+    const tone = TONE_MARK_CODES[ch]
+    if (tone) return tone
+  }
+  return 5
+}
+
+// Read the tones off a whole tone-marked pinyin string (letting a user type
+// e.g. "nǐ hǎo" for a custom word) or a pre-split syllable array (e.g. from
+// pinyin-pro's `type: 'array'` output). Syllable boundaries in a raw string
+// are whitespace or the apostrophe pinyin uses to mark an otherwise-ambiguous
+// boundary (女儿 "nǚ'ér").
+export function parseTonesFromPinyin(pinyin) {
+  const syllables = Array.isArray(pinyin)
+    ? pinyin
+    : String(pinyin || '').trim().split(/[\s']+/).filter(Boolean)
+  return syllables.map(toneFromSyllable)
+}
+
 export const TONE_NAMES = {
   0: 'unclear',
   1: 'high-flat (1)',

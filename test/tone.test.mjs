@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { toSemitones, cleanContour, segment, scoreWord, scoreWordInSentence, toneTarget, PLOT_N } from '../assets/js/tone.js'
+import { toSemitones, cleanContour, segment, scoreWord, scoreWordInSentence, toneTarget, PLOT_N, toneFromSyllable, parseTonesFromPinyin } from '../assets/js/tone.js'
 
 // Build a voiced syllable as an Hz series moving linearly from `fromSt` to
 // `toSt` semitones around a base, so tests exercise the real scorer.
@@ -124,4 +124,30 @@ test('scoreWordInSentence returns null when it cannot align', () => {
   assert.equal(scoreWordInSentence([150, 150], 4, 0, [1]), null)
   // Out-of-range slice.
   assert.equal(scoreWordInSentence(ramp(0, 0, 60), 2, 2, [1]), null)
+})
+
+test('toneFromSyllable reads 1-4 from diacritics and defaults to neutral', () => {
+  assert.equal(toneFromSyllable('mā'), 1)
+  assert.equal(toneFromSyllable('má'), 2)
+  assert.equal(toneFromSyllable('mǎ'), 3)
+  assert.equal(toneFromSyllable('mà'), 4)
+  assert.equal(toneFromSyllable('ma'), 5)
+  assert.equal(toneFromSyllable(''), 5)
+})
+
+test('parseTonesFromPinyin splits a typed string on whitespace and apostrophes', () => {
+  assert.deepEqual(parseTonesFromPinyin('nǐ hǎo'), [3, 3])
+  assert.deepEqual(parseTonesFromPinyin("nǚ'ér"), [3, 2])
+  assert.deepEqual(parseTonesFromPinyin('  bà ba  '), [4, 5])
+})
+
+test('parseTonesFromPinyin treats an unspaced syllable run as one token', () => {
+  // Without a space or apostrophe boundary, "bàba" reads as a single
+  // syllable — syllables typed by hand need a separating space.
+  assert.deepEqual(parseTonesFromPinyin('bàba'), [4])
+})
+
+test('parseTonesFromPinyin accepts a pre-split syllable array', () => {
+  assert.deepEqual(parseTonesFromPinyin(['bà', 'ba']), [4, 5])
+  assert.deepEqual(parseTonesFromPinyin([]), [])
 })
