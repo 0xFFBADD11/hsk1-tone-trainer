@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728i'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728i'
-import { el, clear } from './dom.js?v=20260728i'
-import { speak, speechSupported } from './speech.js?v=20260728i'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728i'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728i'
-import { createQuiz } from './quiz.js?v=20260728i'
-import { toWhisperInput } from './audio.js?v=20260728i'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728i'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728i'
-import { generateExample } from './example.js?v=20260728i'
-import { translateEnglish } from './translate.js?v=20260728i'
+import { HSK1 } from '../data/hsk1.js?v=20260728j'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728j'
+import { el, clear } from './dom.js?v=20260728j'
+import { speak, speechSupported } from './speech.js?v=20260728j'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728j'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728j'
+import { createQuiz } from './quiz.js?v=20260728j'
+import { toWhisperInput } from './audio.js?v=20260728j'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728j'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728j'
+import { generateExample } from './example.js?v=20260728j'
+import { translateEnglish } from './translate.js?v=20260728j'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728i · translate-english-to-add-word'
+const BUILD = '20260728j · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -188,8 +188,25 @@ function verdict(percent) {
 
 // Equal-size playback button: just the icon, with the description as a hover
 // tooltip (title) and an accessible label.
+//
+// Uses pointerdown instead of click. The record button right next to this
+// one (see wireRecordButton) calls preventDefault() on its own pointerdown,
+// which per the Pointer Events spec suppresses the compatibility click that
+// would otherwise fire for that element — and on iOS this has been observed
+// to also suppress click on a neighboring element for the rest of that touch
+// interaction. pointerdown sidesteps click generation entirely, matching the
+// event type already proven to work here (the record button responds fine).
 function iconBtn(icon, label, onclick) {
-  return el('button', { class: 'btn icon', title: label, 'aria-label': label, text: icon, onclick })
+  return el('button', {
+    class: 'btn icon',
+    title: label,
+    'aria-label': label,
+    text: icon,
+    onpointerdown: (ev) => {
+      ev.preventDefault()
+      onclick()
+    }
+  })
 }
 
 // Strictness selector, rendered at the bottom of the practice view.
