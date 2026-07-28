@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728k'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728k'
-import { el, clear } from './dom.js?v=20260728k'
-import { speak, speechSupported } from './speech.js?v=20260728k'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728k'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728k'
-import { createQuiz } from './quiz.js?v=20260728k'
-import { toWhisperInput } from './audio.js?v=20260728k'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728k'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728k'
-import { generateExample } from './example.js?v=20260728k'
-import { translateEnglish } from './translate.js?v=20260728k'
+import { HSK1 } from '../data/hsk1.js?v=20260728l'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728l'
+import { el, clear } from './dom.js?v=20260728l'
+import { speak, speechSupported } from './speech.js?v=20260728l'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728l'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728l'
+import { createQuiz } from './quiz.js?v=20260728l'
+import { toWhisperInput } from './audio.js?v=20260728l'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728l'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728l'
+import { generateExample } from './example.js?v=20260728l'
+import { translateEnglish } from './translate.js?v=20260728l'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728k · translate-english-to-add-word'
+const BUILD = '20260728l · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -1270,24 +1270,36 @@ function renderUnsupported() {
   ]))
 }
 
-// The first user gesture unlocks audio: play the current word (its autoplay
-// was blocked on cold load). Skip if the tap is the record button, which
-// handles the mic itself and must not hear the word played back.
+// Prompt for microphone access up front and release the stream immediately, so
+// recording later needs no prompt. Browsers may require a user gesture (iOS),
+// so this is also retried on the first tap. Leaves micDone false on failure so
+// the gesture retry can prompt.
 //
-// This used to also pre-warm mic permission here (and unconditionally on
-// page load) via a standalone getUserMedia() call, purely to avoid a delay
-// on the first actual recording — but recordPitchContour() already acquires
-// its own mic stream on demand and never depended on this. Acquiring a mic
-// stream at all is known to switch iOS's audio session into a
-// recording-capable category that can silently mute or misroute *other*
-// audio like speechSynthesis playback for the rest of the page's lifetime,
-// and stopping the track afterward doesn't reliably undo it. Given that
-// tradeoff — a barely-noticeable delay on the first record press vs.
-// playback being silently broken for the whole session — the pre-warm isn't
-// worth it, so the mic is now only ever touched when actually recording.
+// (This was removed for a few hours on a theory that it was silently muting
+// speechSynthesis playback on iOS by switching the audio session into a
+// recording-capable category. That theory turned out to be wrong — removing
+// it broke actual recording, with no improvement to playback — so it's
+// restored. See git history around "stop pre-warming mic permission" for the
+// reverted attempt; the play-button silence is still unexplained.)
+let micDone = false
+async function requestMic() {
+  if (micDone || !microphoneSupported()) return
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    for (const track of stream.getTracks()) track.stop()
+    micDone = true
+  } catch {
+    // Leave micDone false so the first user gesture can prompt.
+  }
+}
+
+// The first user gesture unlocks audio: request the mic and play the current
+// word (its autoplay was blocked on cold load). Skip if the tap is the record
+// button, which handles the mic itself and must not hear the word played back.
 function onFirstGesture(ev) {
   const onRecord = ev.target && ev.target.closest && ev.target.closest('#record-btn')
   if (onRecord) return
+  requestMic()
   const word = quiz.current()
   if (word) say(word.hanzi)
 }
@@ -1298,5 +1310,7 @@ if (!speechSupported() || !microphoneSupported()) {
   renderWord()
   // Pronunciation defaults on; start fetching the model so it's ready to use.
   ensurePronModel()
+  // Ask for the mic on load (works on desktop); iOS retries on first gesture.
+  requestMic()
   document.addEventListener('pointerdown', onFirstGesture, { capture: true, once: true })
 }
