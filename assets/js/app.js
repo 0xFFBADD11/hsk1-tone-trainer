@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728d'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728d'
-import { el, clear } from './dom.js?v=20260728d'
-import { speak, speechSupported } from './speech.js?v=20260728d'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728d'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728d'
-import { createQuiz } from './quiz.js?v=20260728d'
-import { toWhisperInput } from './audio.js?v=20260728d'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728d'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728d'
-import { generateExample } from './example.js?v=20260728d'
-import { translateEnglish } from './translate.js?v=20260728d'
+import { HSK1 } from '../data/hsk1.js?v=20260728e'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728e'
+import { el, clear } from './dom.js?v=20260728e'
+import { speak, speechSupported } from './speech.js?v=20260728e'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728e'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728e'
+import { createQuiz } from './quiz.js?v=20260728e'
+import { toWhisperInput } from './audio.js?v=20260728e'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728e'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728e'
+import { generateExample } from './example.js?v=20260728e'
+import { translateEnglish } from './translate.js?v=20260728e'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728d · translate-english-to-add-word'
+const BUILD = '20260728e · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -598,11 +598,13 @@ function wireRecordButton(word) {
     try {
       recorder = await recordPitchContour(setMeter)
       if (!pressActive) {
-        // Released before the mic came up — discard silently.
+        // Released before the mic came up — discard silently. stop() already
+        // ran and found no recorder yet, so the highlight is still on here.
         await recorder.stop()
         recorder = null
         setMeter(0)
         clearFeedback()
+        btn.classList.remove('active')
         return
       }
       setFeedback('Recording… release to score', 'info')
@@ -616,7 +618,14 @@ function wireRecordButton(word) {
 
   async function stop() {
     pressActive = false
-    if (!recorder) return
+    // Mic startup can outlast a quick tap: if start()'s await hasn't
+    // resolved yet, there's no recorder to stop, but the highlight it
+    // already added must still come off — otherwise the button is stuck
+    // "active" until the next successful press.
+    if (!recorder) {
+      btn.classList.remove('active')
+      return
+    }
     btn.classList.remove('active')
     const capture = await recorder.stop()
     recorder = null
@@ -657,6 +666,7 @@ function wireSentenceRecord(word) {
         sentRec = null
         setMeter(0, 'sentence-meter-bar')
         setSentencePron('')
+        btn.classList.remove('active')
         return
       }
       setSentencePron('Recording… read the whole sentence, then release')
@@ -670,7 +680,12 @@ function wireSentenceRecord(word) {
 
   async function stop() {
     pressActive = false
-    if (!sentRec) return
+    // See wireRecordButton's stop() for why this must run even with no
+    // sentRec yet: a quick release can beat the mic's async startup.
+    if (!sentRec) {
+      btn.classList.remove('active')
+      return
+    }
     btn.classList.remove('active')
     const capture = await sentRec.stop()
     sentRec = null
