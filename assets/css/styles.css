@@ -368,8 +368,10 @@ footer p { margin: 0.25rem 0; }
 .form h2 { margin: 0 0 0.25rem; text-align: center; }
 .field-hint { margin: 0; color: var(--muted); font-size: 0.85rem; text-align: center; }
 .field-label { display: block; color: var(--muted); font-size: 0.8rem; margin: 0.75rem 0 0.3rem; }
-.field-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
-.field-row .field-label { margin-bottom: 0; flex: 1; }
+/* Input + its action button side by side (e.g. English input + Look up). */
+.field-row { display: flex; align-items: center; gap: 0.5rem; }
+.field-row .field-input { flex: 1; min-width: 0; }
+.field-row-btn { flex: 0 0 auto; }
 .field-input {
   width: 100%;
   background: var(--bg);
@@ -402,6 +404,7 @@ footer p { margin: 0.25rem 0; }
 
 .backup-section { margin-top: 1rem; text-align: center; }
 .backup-section h3 { margin: 0 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
+.backup-buttons .btn { flex: 1; max-width: 11rem; }
 .file-input-hidden { display: none; }
 .backup-actions { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
 
