@@ -11,10 +11,17 @@
 // `@leonsilicon/hsk2.0`) — a match that's actual everyday vocabulary sorts
 // first.
 
-import { numericPinyinToMarks } from './pinyin.js?v=20260728v'
-import { withTimeout } from './timeout.js?v=20260728v'
+import { numericPinyinToMarks } from './pinyin.js?v=20260728w'
+import { withTimeout } from './timeout.js?v=20260728w'
 
-const CEDICT_URL = 'https://cdn.jsdelivr.net/npm/cedict-json@1.3.20251213/+esm'
+// Fetched as raw JSON (not `+esm`) on purpose: jsdelivr's +esm bundler
+// inlines this ~200k-entry dictionary as one giant JS array-literal
+// expression, and parsing that literal recursively overflows the (much
+// smaller) parser stack on iOS Safari/Chrome — both use JavaScriptCore,
+// which throws "Maximum call stack size exceeded" on it, even though the
+// identical data loads fine on desktop. JSON.parse (via fetch().json())
+// doesn't share that recursive-descent literal parser, so it's immune.
+const CEDICT_URL = 'https://cdn.jsdelivr.net/npm/cedict-json@1.3.20251213/cedict.json'
 const HSK_WORDS_URL = 'https://cdn.jsdelivr.net/npm/@leonsilicon/hsk2.0@0.0.0/HSK2.0_words.json'
 
 const MAX_CANDIDATES = 8
@@ -104,15 +111,18 @@ async function ensureLoaded() {
   if (index) return
   if (!loading) {
     const attempt = (async () => {
-      const [cedictMod, words] = await Promise.all([
-        import(CEDICT_URL),
+      const [cedict, words] = await Promise.all([
+        fetch(CEDICT_URL).then((r) => {
+          if (!r.ok) throw new Error(`CC-CEDICT request failed (${r.status})`)
+          return r.json()
+        }),
         fetch(HSK_WORDS_URL).then((r) => {
           if (!r.ok) throw new Error(`HSK word list request failed (${r.status})`)
           return r.json()
         })
       ])
       hskWords = new Set(words)
-      index = buildIndex(cedictMod.default)
+      index = buildIndex(cedict)
     })()
     loading = withTimeout(attempt, LOAD_TIMEOUT_MS, 'timed out loading the dictionary').catch((err) => {
       // Let a later call retry instead of staying wedged on one failure
