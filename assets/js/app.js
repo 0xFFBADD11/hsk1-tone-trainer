@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728q'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728q'
-import { el, clear } from './dom.js?v=20260728q'
-import { speak, speechSupported } from './speech.js?v=20260728q'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728q'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728q'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260728q'
-import { toWhisperInput } from './audio.js?v=20260728q'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728q'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress } from './storage.js?v=20260728q'
-import { generateExample } from './example.js?v=20260728q'
-import { translateEnglish } from './translate.js?v=20260728q'
+import { HSK1 } from '../data/hsk1.js?v=20260728r'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728r'
+import { el, clear } from './dom.js?v=20260728r'
+import { speak, speechSupported } from './speech.js?v=20260728r'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728r'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728r'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260728r'
+import { toWhisperInput } from './audio.js?v=20260728r'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728r'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup } from './storage.js?v=20260728r'
+import { generateExample } from './example.js?v=20260728r'
+import { translateEnglish } from './translate.js?v=20260728r'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728q · translate-english-to-add-word'
+const BUILD = '20260728r · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -1174,10 +1174,64 @@ function renderConfirmWord(word) {
 // previously added ones (with delete, since typos should be fixable).
 // `prefill` re-populates the fields when returning here to edit a candidate
 // from the confirmation step.
+// Trigger a browser download of `text` as a file named `filename`.
+function downloadTextFile(filename, text, mimeType) {
+  const blob = new Blob([text], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = el('a', { href: url, download: filename })
+  document.body.append(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 function renderAddWord(prefill = {}) {
   clear(app)
 
   const errorEl = el('p', { class: 'form-error' })
+  const backupStatusEl = el('p', { class: 'field-hint' })
+
+  function downloadBackup() {
+    const data = exportBackup()
+    const date = new Date().toISOString().slice(0, 10)
+    downloadTextFile(`hsk1-tone-trainer-backup-${date}.json`, JSON.stringify(data, null, 2), 'application/json')
+    backupStatusEl.textContent = 'Backup downloaded.'
+  }
+
+  function restoreFromFile(file) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      let data
+      try {
+        data = JSON.parse(reader.result)
+      } catch {
+        backupStatusEl.textContent = 'That file is not valid JSON.'
+        return
+      }
+      const result = validateBackup(data)
+      if (result.error) {
+        backupStatusEl.textContent = `Could not restore: ${result.error}`
+        return
+      }
+      const ok = window.confirm(
+        `This backup has ${result.wordCount} added word(s) and ${result.scoreCount} scored word(s). ` +
+        'Restoring will replace everything currently saved on this device — added words, scores, ' +
+        'mastered status, and preferences. This cannot be undone. Continue?'
+      )
+      if (!ok) return
+      applyBackup(data)
+      window.location.reload()
+    }
+    reader.onerror = () => { backupStatusEl.textContent = 'Could not read that file.' }
+    reader.readAsText(file)
+  }
+
+  const backupFileInput = el('input', { type: 'file', accept: 'application/json,.json', class: 'file-input-hidden' })
+  backupFileInput.addEventListener('change', () => {
+    const file = backupFileInput.files && backupFileInput.files[0]
+    backupFileInput.value = ''
+    if (file) restoreFromFile(file)
+  })
   const hanziInput = el('input', { type: 'text', class: 'field-input', placeholder: '你好', autocomplete: 'off', value: prefill.hanzi || '' })
   const pinyinInput = el('input', { type: 'text', class: 'field-input', placeholder: 'nǐ hǎo', autocomplete: 'off', value: prefill.pinyin || '' })
   const enInput = el('input', {
@@ -1303,6 +1357,16 @@ function renderAddWord(prefill = {}) {
     el('div', { class: 'card word-manage' }, [
       el('h3', { text: 'Your added words' }),
       ...manageItems
+    ]),
+    el('div', { class: 'card backup-section' }, [
+      el('h3', { text: 'Backup & restore' }),
+      el('p', { class: 'field-hint', text: 'Save your added words, scores, and preferences to a file — for backup, or to continue on another device.' }),
+      el('div', { class: 'controls' }, [
+        el('button', { type: 'button', class: 'btn ghost small', text: '⬇️ Download backup', onclick: downloadBackup }),
+        el('button', { type: 'button', class: 'btn ghost small', text: '⬆️ Restore from file', onclick: () => backupFileInput.click() })
+      ]),
+      backupFileInput,
+      backupStatusEl
     ]),
     el('div', { class: 'danger-zone' }, [
       el('button', { class: 'btn ghost small danger', text: '↺ Reset practice progress', onclick: resetProgress })
