@@ -382,6 +382,7 @@ footer p { margin: 0.25rem 0; }
   font-size: 1.1rem;
 }
 .field-input:focus { outline: none; border-color: var(--accent-soft); }
+.field-input::placeholder { color: var(--muted); opacity: 1; }
 .form-error { color: var(--bad); min-height: 1.1em; margin: 0.6rem 0 0; font-size: 0.9rem; }
 .btn.small { padding: 0.3rem 0.6rem; font-size: 0.85rem; flex: 0; }
 .btn.danger { border-color: var(--bad); color: var(--bad); }
