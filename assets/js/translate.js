@@ -1,38 +1,23 @@
 // Best-effort English -> Chinese lookup for the "Add word" form, so a
 // learner can type just an English word and get hanzi/pinyin candidates to
-// pick from. Backed by CC-CEDICT (via the `cedict-json` package), lazily
-// loaded from jsdelivr — the same CDN this app already uses for pinyin-pro
-// and Transformers.js — so it costs nothing until the learner actually uses
-// it, and degrades to "no matches" rather than breaking the form if it can't
-// load (offline, CDN blocked).
-//
-// CC-CEDICT alone has no frequency signal and is dominated by rare/literary
-// entries, so results are ranked against a common-word list (HSK 1-6, via
-// `@leonsilicon/hsk2.0`) — a match that's actual everyday vocabulary sorts
-// first.
+// pick from. Backed by a local, curated CC-CEDICT subset (see
+// assets/data/cedict-common.js) rather than the full ~124k-entry, ~16.5MB
+// CC-CEDICT dataset: fetching and parsing that much JSON — even as raw JSON
+// via fetch().json(), not just a dynamic import() of a bundled JS module —
+// overflowed the JS engine's stack on iOS Safari/Chrome ("RangeError:
+// Maximum call stack size exceeded") despite working fine on desktop. The
+// curated subset (every CC-CEDICT entry whose simplified form is in the
+// HSK 1-6 common-word list) covers the vast majority of everyday vocabulary
+// a learner would want to add, at a size safely below that limit on any
+// device.
 
-import { numericPinyinToMarks } from './pinyin.js?v=20260728w'
-import { withTimeout } from './timeout.js?v=20260728w'
-
-// Fetched as raw JSON (not `+esm`) on purpose: jsdelivr's +esm bundler
-// inlines this ~200k-entry dictionary as one giant JS array-literal
-// expression, and parsing that literal recursively overflows the (much
-// smaller) parser stack on iOS Safari/Chrome — both use JavaScriptCore,
-// which throws "Maximum call stack size exceeded" on it, even though the
-// identical data loads fine on desktop. JSON.parse (via fetch().json())
-// doesn't share that recursive-descent literal parser, so it's immune.
-const CEDICT_URL = 'https://cdn.jsdelivr.net/npm/cedict-json@1.3.20251213/cedict.json'
-const HSK_WORDS_URL = 'https://cdn.jsdelivr.net/npm/@leonsilicon/hsk2.0@0.0.0/HSK2.0_words.json'
+import { CEDICT_COMMON } from '../data/cedict-common.js?v=20260728x'
+import { numericPinyinToMarks } from './pinyin.js?v=20260728x'
 
 const MAX_CANDIDATES = 8
-// The dictionary is a multi-MB one-time download; on a slow connection this
-// bounds the wait so a stalled fetch fails outright instead of leaving
-// "Looking up…" stuck forever.
-const LOAD_TIMEOUT_MS = 20000
 
 let index = null // Map<normalized gloss clause, Array<{ entry, senseIndex, display }>>
 let hskWords = null // Set<string> of common (HSK 1-6) simplified words
-let loading = null
 
 function stripParens(s) {
   return s.replace(/\([^)]*\)/g, '')
@@ -107,41 +92,23 @@ export function lookupIndex(idx, hskWords, query) {
   }))
 }
 
-async function ensureLoaded() {
+// The whole subset is common by construction (see cedict-common.js), so
+// every lookup ties on that criterion and falls through to lookupIndex's
+// other sort keys — kept as a real Set (rather than dropping the parameter)
+// so lookupIndex's ranking behavior stays identical if the data source ever
+// grows to include non-common entries again.
+function ensureIndex() {
   if (index) return
-  if (!loading) {
-    const attempt = (async () => {
-      const [cedict, words] = await Promise.all([
-        fetch(CEDICT_URL).then((r) => {
-          if (!r.ok) throw new Error(`CC-CEDICT request failed (${r.status})`)
-          return r.json()
-        }),
-        fetch(HSK_WORDS_URL).then((r) => {
-          if (!r.ok) throw new Error(`HSK word list request failed (${r.status})`)
-          return r.json()
-        })
-      ])
-      hskWords = new Set(words)
-      index = buildIndex(cedict)
-    })()
-    loading = withTimeout(attempt, LOAD_TIMEOUT_MS, 'timed out loading the dictionary').catch((err) => {
-      // Let a later call retry instead of staying wedged on one failure
-      // (e.g. a transient network blip).
-      loading = null
-      throw err
-    })
-  }
-  await loading
+  index = buildIndex(CEDICT_COMMON)
+  hskWords = new Set(CEDICT_COMMON.map((e) => e.simplified))
 }
 
 // Ranked hanzi/pinyin/en candidates for an English word or short phrase.
-// Common (HSK) words sort first, then by how prominent the matched sense is
-// in the dictionary entry, then shorter words first. [] if there's no match.
-// Throws if the dictionary itself couldn't be loaded (offline, CDN
-// unreachable) — the caller should show that as distinct from "no match",
-// since they call for different next steps.
+// [] if there's no match. This dictionary is bundled locally, so there's no
+// network/loading step or failure mode here (unlike the CDN-fetched version
+// this replaced) — kept async since callers already await it.
 export async function translateEnglish(query) {
   if (!(query || '').trim()) return []
-  await ensureLoaded()
+  ensureIndex()
   return lookupIndex(index, hskWords, query)
 }
