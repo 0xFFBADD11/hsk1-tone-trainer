@@ -17,7 +17,10 @@ const browserGlobals = {
 }
 
 export default [
-  { ignores: ['.wrangler/**'] },
+  // cedict-common.js is machine-generated data (see its header comment for
+  // how to regenerate it), not hand-authored source, so house style
+  // (quotes, semicolons, indent) doesn't apply to it.
+  { ignores: ['.wrangler/**', 'assets/data/cedict-common.js'] },
   {
     files: ['**/*.js', '**/*.mjs'],
     languageOptions: {
