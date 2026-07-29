@@ -80,6 +80,12 @@ export function speak(text, rate = 0.85, onStatus) {
     if (onStatus) onStatus('Speech synthesis not supported in this browser.')
     return
   }
-  window.speechSynthesis.cancel()
+  const synth = window.speechSynthesis
+  // Only cancel when there's actually something to interrupt. Calling
+  // cancel() unconditionally — even with an empty queue — can catch the
+  // very next speak() in the same cancellation on some Chromium builds
+  // (observed in Brave), silently dropping it with error "canceled" instead
+  // of speaking it. Skipping the no-op case avoids that race entirely.
+  if (synth.speaking || synth.pending) synth.cancel()
   utterAndSpeak(text, rate, onStatus)
 }
