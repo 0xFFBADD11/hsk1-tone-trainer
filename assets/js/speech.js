@@ -89,3 +89,39 @@ export function speak(text, rate = 0.85, onStatus) {
   if (synth.speaking || synth.pending) synth.cancel()
   utterAndSpeak(text, rate, onStatus)
 }
+
+// Resolves once the platform's voice list is populated, or after `timeoutMs`
+// if it never fires (some devices never dispatch voiceschanged at all).
+function voicesReady(timeoutMs = 500) {
+  const synth = window.speechSynthesis
+  if (synth.getVoices().length > 0) return Promise.resolve()
+  return new Promise((resolve) => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      synth.removeEventListener('voiceschanged', finish)
+      resolve()
+    }
+    synth.addEventListener('voiceschanged', finish)
+    setTimeout(finish, timeoutMs)
+  })
+}
+
+// Like speak(), but waits briefly for the voice list to finish loading first
+// (up to timeoutMs) if it hasn't already. Only for callers outside a user
+// gesture — the word card's auto-play on render is the one case here, which
+// isn't gesture-triggered to begin with (browsers that allow it at all do so
+// via an autoplay allowance from prior visits, not a click) — never for
+// button taps, which must stay synchronous per speak()'s note above. Without
+// this, a cold/refreshed page's very first, automatic playback can land
+// before voices load and silently fall back to a different, worse voice
+// than every later manual play of the same word gets once voices are ready.
+export async function speakWhenReady(text, rate = 0.85, onStatus) {
+  if (!speechSupported()) {
+    if (onStatus) onStatus('Speech synthesis not supported in this browser.')
+    return
+  }
+  await voicesReady()
+  speak(text, rate, onStatus)
+}

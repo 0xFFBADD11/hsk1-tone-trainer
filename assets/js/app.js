@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260729a'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260729a'
-import { el, clear } from './dom.js?v=20260729a'
-import { speak, speechSupported } from './speech.js?v=20260729a'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260729a'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260729a'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260729a'
-import { toWhisperInput } from './audio.js?v=20260729a'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260729a'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260729a'
-import { generateExample } from './example.js?v=20260729a'
-import { translateEnglish } from './translate.js?v=20260729a'
+import { HSK1 } from '../data/hsk1.js?v=20260729b'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260729b'
+import { el, clear } from './dom.js?v=20260729b'
+import { speak, speakWhenReady, speechSupported } from './speech.js?v=20260729b'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260729b'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260729b'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260729b'
+import { toWhisperInput } from './audio.js?v=20260729b'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260729b'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260729b'
+import { generateExample } from './example.js?v=20260729b'
+import { translateEnglish } from './translate.js?v=20260729b'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -86,7 +86,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260729a'
+const BUILD = '20260729b'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -207,6 +207,15 @@ function loadSlowPref() {
 function say(text) {
   setPronStatus(`Speaking “${text}”…`)
   speak(text, slowMode ? SLOW_RATE : NORMAL_RATE, setPronStatus)
+}
+
+// Same as say(), but for the word card's auto-play on render, which isn't a
+// user gesture — see speakWhenReady()'s note on why it's safe to wait there
+// (and not elsewhere) for the voice list so the very first, automatic
+// playback picks the same voice as every later manual tap.
+function sayAuto(text) {
+  setPronStatus(`Speaking “${text}”…`)
+  speakWhenReady(text, slowMode ? SLOW_RATE : NORMAL_RATE, setPronStatus)
 }
 
 function scorePercent(score) {
@@ -648,7 +657,7 @@ function renderWord() {
   if (best !== undefined) showBest(best)
 
   // Play the word automatically (blocked before the first gesture on cold load).
-  say(word.hanzi)
+  sayAuto(word.hanzi)
 }
 
 // Fill the sentence hanzi row with clickable words (target word bold).
