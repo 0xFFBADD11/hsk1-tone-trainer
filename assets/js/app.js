@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728u'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728u'
-import { el, clear } from './dom.js?v=20260728u'
-import { speak, speechSupported } from './speech.js?v=20260728u'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728u'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728u'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260728u'
-import { toWhisperInput } from './audio.js?v=20260728u'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728u'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260728u'
-import { generateExample } from './example.js?v=20260728u'
-import { translateEnglish } from './translate.js?v=20260728u'
+import { HSK1 } from '../data/hsk1.js?v=20260728v'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728v'
+import { el, clear } from './dom.js?v=20260728v'
+import { speak, speechSupported } from './speech.js?v=20260728v'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728v'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728v'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260728v'
+import { toWhisperInput } from './audio.js?v=20260728v'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728v'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260728v'
+import { generateExample } from './example.js?v=20260728v'
+import { translateEnglish } from './translate.js?v=20260728v'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -23,6 +23,19 @@ const ACCEPT_PERCENT = 70
 
 // Shown when the mic is blocked (e.g. accidentally denied) — how to re-enable.
 const MIC_HELP = 'Mic blocked. On iPhone: tap “aA” in the address bar → Website Settings → Microphone → Allow, then reload.'
+
+// recordPitchContour()'s own timeout (see pitch.js) produces a distinct
+// failure that isn't a permission problem — the audio context or getUserMedia
+// call itself got stuck, not denied — so it needs different guidance than
+// MIC_HELP's "check the permission setting" steps, which don't apply and are
+// just confusing here.
+function micErrorMessage(e) {
+  const msg = e && e.message ? e.message : String(e)
+  if (/stuck resuming|did not respond/i.test(msg)) {
+    return `Mic didn't respond in time — try reloading the page. (${msg})`
+  }
+  return `${MIC_HELP} (${msg})`
+}
 
 // Pronunciation closeness (0..1) bands: at/above ACCEPT is correct, above NEAR
 // is a near miss, below is a different word.
@@ -73,7 +86,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728u · translate-english-to-add-word'
+const BUILD = '20260728v · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -670,7 +683,7 @@ function wireRecordButton(word) {
       recorder = null
       setMicIdle(btn)
       setMeter(0)
-      setFeedback(`${MIC_HELP} (${e.message})`, 'error')
+      setFeedback(micErrorMessage(e), 'info')
     }
   }
 
@@ -733,7 +746,7 @@ function wireSentenceRecord(word) {
       sentRec = null
       setMicIdle(btn)
       setMeter(0, 'sentence-meter-bar')
-      setSentencePron(`${MIC_HELP} (${e.message})`)
+      setSentencePron(micErrorMessage(e))
     }
   }
 
@@ -826,7 +839,7 @@ function evaluate(word, capture) {
       peak < SILENT_PEAK
         ? `No audio captured — the mic returned silence. Try reloading the page. ${diag}`
         : `Too quiet or too short — try speaking the whole word. ${diag}`,
-      'error'
+      'info'
     )
     return
   }
@@ -1056,7 +1069,7 @@ function setFeedback(message, kind) {
   const box = document.getElementById('tone-result')
   if (!box) return
   clear(box)
-  box.className = `score-panel shown ${kind}`
+  box.className = `score-panel shown ${kind || ''}`.trim()
   box.append(el('p', { text: message }))
 }
 
