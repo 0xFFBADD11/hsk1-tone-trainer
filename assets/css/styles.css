@@ -339,6 +339,13 @@ footer p { margin: 0.25rem 0; }
   width: 100%;
   max-height: 14rem;
   overflow-y: auto;
+  /* Without this, scrolling past this list's own top/bottom edge chains the
+     remaining scroll to the whole page, yanking the app window itself up —
+     contain stops the scroll dead at this list's boundary instead. */
+  overscroll-behavior: contain;
+  /* Applies to the direct scrollTop assignment in fillWordList() too, so
+     that auto-scroll still animates smoothly. */
+  scroll-behavior: smooth;
 }
 .wordlist-title {
   margin: 0 0 0.5rem;
