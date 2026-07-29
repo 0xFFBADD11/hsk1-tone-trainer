@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260729b'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260729b'
-import { el, clear } from './dom.js?v=20260729b'
-import { speak, speakWhenReady, speechSupported } from './speech.js?v=20260729b'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260729b'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260729b'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260729b'
-import { toWhisperInput } from './audio.js?v=20260729b'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260729b'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260729b'
-import { generateExample } from './example.js?v=20260729b'
-import { translateEnglish } from './translate.js?v=20260729b'
+import { HSK1 } from '../data/hsk1.js?v=20260729c'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260729c'
+import { el, clear } from './dom.js?v=20260729c'
+import { speak, speakWhenReady, speechSupported } from './speech.js?v=20260729c'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260729c'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260729c'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260729c'
+import { toWhisperInput } from './audio.js?v=20260729c'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260729c'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260729c'
+import { generateExample } from './example.js?v=20260729c'
+import { translateEnglish } from './translate.js?v=20260729c'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -86,7 +86,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260729b'
+const BUILD = '20260729c'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -501,15 +501,20 @@ function fillWordList(node) {
 
   // Keep the active word visible in the (possibly scrolled) list, but only
   // move the scroll position when it's actually out of view — an
-  // unconditional scrollIntoView() would yank the list back every time this
+  // unconditional scroll would yank the list back every time this
   // re-renders (e.g. on each score), even while the learner is scrolled
-  // elsewhere looking at other words.
+  // elsewhere looking at other words. Sets node.scrollTop directly rather
+  // than currentEl.scrollIntoView(), which walks up and can also scroll
+  // ancestor containers (the whole page) if this list isn't the only
+  // scrollable element in the chain — this only ever touches this list.
   const currentEl = items.querySelector('.wl-item.current')
   if (currentEl) {
     const containerRect = node.getBoundingClientRect()
     const itemRect = currentEl.getBoundingClientRect()
     const visible = itemRect.top >= containerRect.top && itemRect.bottom <= containerRect.bottom
-    if (!visible) currentEl.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    if (!visible) {
+      node.scrollTop += itemRect.top - containerRect.top
+    }
   }
 }
 
