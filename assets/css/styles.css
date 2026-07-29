@@ -400,6 +400,10 @@ footer p { margin: 0.25rem 0; }
 
 .danger-zone { margin-top: 1rem; text-align: center; }
 
+.backup-section { margin-top: 1rem; text-align: center; }
+.backup-section h3 { margin: 0 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
+.file-input-hidden { display: none; }
+
 .translate-candidates { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }
 .translate-candidate {
   display: flex;

@@ -5,6 +5,12 @@
 
 const CUSTOM_WORDS_KEY = 'custom-words'
 const PROGRESS_KEY = 'progress'
+const STRICTNESS_KEY = 'strictness'
+const SLOW_KEY = 'slow'
+const PRON_KEY = 'pron'
+
+// Bump if the backup shape ever changes incompatibly.
+const BACKUP_VERSION = 1
 
 function safeGet(key) {
   try {
@@ -69,4 +75,58 @@ export function saveProgress(progress) {
 
 export function clearProgress() {
   safeRemove(PROGRESS_KEY)
+}
+
+// A full snapshot of everything this app stores locally: custom words,
+// practice progress, and preferences (strictness/slow/pronunciation-check).
+// Suitable for saving to a file and restoring later, on this device or
+// another one.
+export function exportBackup() {
+  return {
+    app: 'hsk1-tone-trainer',
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    customWords: loadCustomWords(),
+    progress: loadProgress(),
+    prefs: {
+      strictness: safeGet(STRICTNESS_KEY),
+      slow: safeGet(SLOW_KEY),
+      pron: safeGet(PRON_KEY)
+    }
+  }
+}
+
+// Validate a parsed backup object (from exportBackup(), possibly hand-edited
+// or from an older version) before it's applied — checked separately from
+// applying it so the caller can show the user what's about to change first.
+// Returns { error } or { ok: true, wordCount, scoreCount }.
+export function validateBackup(data) {
+  if (!data || typeof data !== 'object') return { error: 'Not a valid backup file.' }
+  if (!Array.isArray(data.customWords)) return { error: 'Missing or invalid word list in this file.' }
+  for (const w of data.customWords) {
+    if (!w || typeof w.hanzi !== 'string' || typeof w.pinyin !== 'string' ||
+        !Array.isArray(w.tones) || typeof w.en !== 'string') {
+      return { error: 'One of the words in this file is malformed.' }
+    }
+  }
+  const progress = data.progress
+  if (!progress || typeof progress !== 'object' ||
+      typeof progress.scores !== 'object' || progress.scores === null ||
+      !Array.isArray(progress.mastered)) {
+    return { error: 'Missing or invalid progress data in this file.' }
+  }
+  return { ok: true, wordCount: data.customWords.length, scoreCount: Object.keys(progress.scores).length }
+}
+
+// Apply an already-validated backup object, replacing current custom words,
+// progress, and preferences entirely. Caller should reload afterward so
+// every in-memory copy of this data (the live word pool, the quiz, etc.)
+// picks it up fresh rather than needing to be patched individually.
+export function applyBackup(data) {
+  saveCustomWords(data.customWords)
+  saveProgress({ scores: data.progress.scores, mastered: data.progress.mastered })
+  const prefs = data.prefs || {}
+  if (prefs.strictness) safeSet(STRICTNESS_KEY, prefs.strictness)
+  if (prefs.slow) safeSet(SLOW_KEY, prefs.slow)
+  if (prefs.pron) safeSet(PRON_KEY, prefs.pron)
 }
