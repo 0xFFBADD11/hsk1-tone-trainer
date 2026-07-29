@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728r'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728r'
-import { el, clear } from './dom.js?v=20260728r'
-import { speak, speechSupported } from './speech.js?v=20260728r'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728r'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728r'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260728r'
-import { toWhisperInput } from './audio.js?v=20260728r'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728r'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup } from './storage.js?v=20260728r'
-import { generateExample } from './example.js?v=20260728r'
-import { translateEnglish } from './translate.js?v=20260728r'
+import { HSK1 } from '../data/hsk1.js?v=20260728s'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728s'
+import { el, clear } from './dom.js?v=20260728s'
+import { speak, speechSupported } from './speech.js?v=20260728s'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728s'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728s'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260728s'
+import { toWhisperInput } from './audio.js?v=20260728s'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728s'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260728s'
+import { generateExample } from './example.js?v=20260728s'
+import { translateEnglish } from './translate.js?v=20260728s'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -73,7 +73,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728r · translate-english-to-add-word'
+const BUILD = '20260728s · translate-english-to-add-word'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -1190,6 +1190,7 @@ function renderAddWord(prefill = {}) {
 
   const errorEl = el('p', { class: 'form-error' })
   const backupStatusEl = el('p', { class: 'field-hint' })
+  const backupActionsEl = el('div', { class: 'backup-actions' })
 
   function downloadBackup() {
     const data = exportBackup()
@@ -1198,9 +1199,15 @@ function renderAddWord(prefill = {}) {
     backupStatusEl.textContent = 'Backup downloaded.'
   }
 
+  function finishRestore(applyFn, data) {
+    applyFn(data)
+    window.location.reload()
+  }
+
   function restoreFromFile(file) {
     const reader = new FileReader()
     reader.onload = () => {
+      clear(backupActionsEl)
       let data
       try {
         data = JSON.parse(reader.result)
@@ -1213,16 +1220,38 @@ function renderAddWord(prefill = {}) {
         backupStatusEl.textContent = `Could not restore: ${result.error}`
         return
       }
-      const ok = window.confirm(
-        `This backup has ${result.wordCount} added word(s) and ${result.scoreCount} scored word(s). ` +
-        'Restoring will replace everything currently saved on this device — added words, scores, ' +
-        'mastered status, and preferences. This cannot be undone. Continue?'
+      const when = data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'an unknown date'
+      backupStatusEl.textContent =
+        `This backup has ${result.wordCount} added word(s) and ${result.scoreCount} scored word(s), exported ${when}.`
+      backupActionsEl.append(
+        el('button', {
+          type: 'button',
+          class: 'btn ghost small',
+          text: '➕ Merge with current data',
+          title: 'Adds missing words and keeps the best score for each — never removes anything already here.',
+          onclick: () => finishRestore(mergeBackup, data)
+        }),
+        el('button', {
+          type: 'button',
+          class: 'btn ghost small danger',
+          text: '🔁 Replace everything',
+          onclick: () => {
+            const ok = window.confirm(
+              'Replace everything currently saved on this device — added words, scores, mastered ' +
+              'status, and preferences — with this backup? This cannot be undone.'
+            )
+            if (ok) finishRestore(applyBackup, data)
+          }
+        }),
+        el('button', {
+          type: 'button',
+          class: 'btn ghost small',
+          text: 'Cancel',
+          onclick: () => { clear(backupActionsEl); backupStatusEl.textContent = '' }
+        })
       )
-      if (!ok) return
-      applyBackup(data)
-      window.location.reload()
     }
-    reader.onerror = () => { backupStatusEl.textContent = 'Could not read that file.' }
+    reader.onerror = () => { backupStatusEl.textContent = 'Could not read that file.'; clear(backupActionsEl) }
     reader.readAsText(file)
   }
 
@@ -1366,7 +1395,8 @@ function renderAddWord(prefill = {}) {
         el('button', { type: 'button', class: 'btn ghost small', text: '⬆️ Restore from file', onclick: () => backupFileInput.click() })
       ]),
       backupFileInput,
-      backupStatusEl
+      backupStatusEl,
+      backupActionsEl
     ]),
     el('div', { class: 'danger-zone' }, [
       el('button', { class: 'btn ghost small danger', text: '↺ Reset practice progress', onclick: resetProgress })

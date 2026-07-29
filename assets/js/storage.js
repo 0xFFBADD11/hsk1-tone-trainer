@@ -130,3 +130,41 @@ export function applyBackup(data) {
   if (prefs.slow) safeSet(SLOW_KEY, prefs.slow)
   if (prefs.pron) safeSet(PRON_KEY, prefs.pron)
 }
+
+// Pure merge of two { customWords, progress } shaped objects (as returned by
+// { customWords: loadCustomWords(), progress: loadProgress() }, or an
+// already-validated backup): custom words are unioned by hanzi — `existing`
+// wins on a collision, so a local edit made since the backup was taken isn't
+// clobbered — scores take the best (highest) of the two sides per word
+// (consistent with how a single session already only ever keeps a word's
+// best attempt), and mastered status is the union. Never loses data already
+// on this device, unlike a replace.
+export function mergeData(existing, incoming) {
+  const existingHanzi = new Set(existing.customWords.map((w) => w.hanzi))
+  const customWords = [
+    ...existing.customWords,
+    ...incoming.customWords.filter((w) => !existingHanzi.has(w.hanzi))
+  ]
+
+  const scores = { ...existing.progress.scores }
+  for (const [hanzi, score] of Object.entries(incoming.progress.scores)) {
+    if (scores[hanzi] === undefined || score > scores[hanzi]) scores[hanzi] = score
+  }
+  const mastered = [...new Set([...existing.progress.mastered, ...incoming.progress.mastered])]
+
+  return { customWords, progress: { scores, mastered } }
+}
+
+// Merge an already-validated backup into what's currently saved (see
+// mergeData for the merge rules). Preferences are left untouched — a
+// backup's prefs, possibly from a different device, shouldn't override this
+// device's current settings the way an explicit "replace" does. Caller
+// should reload afterward, same as applyBackup().
+export function mergeBackup(data) {
+  const merged = mergeData(
+    { customWords: loadCustomWords(), progress: loadProgress() },
+    { customWords: data.customWords, progress: data.progress }
+  )
+  saveCustomWords(merged.customWords)
+  saveProgress(merged.progress)
+}

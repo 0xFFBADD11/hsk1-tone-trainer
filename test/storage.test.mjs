@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateBackup } from '../assets/js/storage.js'
+import { validateBackup, mergeData } from '../assets/js/storage.js'
 
 const validWord = { hanzi: '你好', pinyin: 'nǐ hǎo', tones: [3, 3], en: 'hello', custom: true }
 
@@ -46,4 +46,40 @@ test('rejects missing or malformed progress', () => {
   assert.ok(validateBackup({ ...bases, progress: { scores: {} } }).error)
   assert.ok(validateBackup({ ...bases, progress: { scores: null, mastered: [] } }).error)
   assert.ok(validateBackup({ ...bases, progress: { scores: {}, mastered: 'nope' } }).error)
+})
+
+const coffee = { hanzi: '咖啡', pinyin: 'kā fēi', tones: [1, 1], en: 'coffee', custom: true }
+const cat = { hanzi: '猫', pinyin: 'māo', tones: [1], en: 'cat', custom: true }
+
+test('mergeData unions custom words, existing wins on a hanzi collision', () => {
+  const existing = { customWords: [coffee], progress: { scores: {}, mastered: [] } }
+  const editedCoffee = { ...coffee, en: 'coffee (edited locally)' }
+  const incoming = { customWords: [editedCoffee, cat], progress: { scores: {}, mastered: [] } }
+  const merged = mergeData(existing, incoming)
+  assert.deepEqual(merged.customWords, [coffee, cat])
+})
+
+test('mergeData keeps the best (highest) score per word from either side', () => {
+  const existing = { customWords: [], progress: { scores: { '爱': 0.5, '猫': 0.9 }, mastered: [] } }
+  const incoming = { customWords: [], progress: { scores: { '爱': 0.8, '猫': 0.3, '狗': 0.4 }, mastered: [] } }
+  const merged = mergeData(existing, incoming)
+  assert.deepEqual(merged.progress.scores, { '爱': 0.8, '猫': 0.9, '狗': 0.4 })
+})
+
+test('mergeData unions mastered status without duplicates', () => {
+  const existing = { customWords: [], progress: { scores: {}, mastered: ['爱', '猫'] } }
+  const incoming = { customWords: [], progress: { scores: {}, mastered: ['猫', '狗'] } }
+  const merged = mergeData(existing, incoming)
+  assert.deepEqual(new Set(merged.progress.mastered), new Set(['爱', '猫', '狗']))
+  assert.equal(merged.progress.mastered.length, 3)
+})
+
+test('mergeData does not mutate its inputs', () => {
+  const existing = { customWords: [coffee], progress: { scores: { '爱': 0.5 }, mastered: ['爱'] } }
+  const incoming = { customWords: [cat], progress: { scores: { '爱': 0.9 }, mastered: ['猫'] } }
+  const existingCopy = JSON.parse(JSON.stringify(existing))
+  const incomingCopy = JSON.parse(JSON.stringify(incoming))
+  mergeData(existing, incoming)
+  assert.deepEqual(existing, existingCopy)
+  assert.deepEqual(incoming, incomingCopy)
 })
