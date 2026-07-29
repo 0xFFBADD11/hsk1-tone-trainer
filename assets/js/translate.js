@@ -11,8 +11,8 @@
 // `@leonsilicon/hsk2.0`) — a match that's actual everyday vocabulary sorts
 // first.
 
-import { numericPinyinToMarks } from './pinyin.js?v=20260728r'
-import { withTimeout } from './timeout.js?v=20260728r'
+import { numericPinyinToMarks } from './pinyin.js?v=20260728s'
+import { withTimeout } from './timeout.js?v=20260728s'
 
 const CEDICT_URL = 'https://cdn.jsdelivr.net/npm/cedict-json@1.3.20251213/+esm'
 const HSK_WORDS_URL = 'https://cdn.jsdelivr.net/npm/@leonsilicon/hsk2.0@0.0.0/HSK2.0_words.json'

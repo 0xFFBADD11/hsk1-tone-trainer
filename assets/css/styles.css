@@ -403,6 +403,7 @@ footer p { margin: 0.25rem 0; }
 .backup-section { margin-top: 1rem; text-align: center; }
 .backup-section h3 { margin: 0 0 0.35rem; font-size: 0.95rem; color: var(--muted); }
 .file-input-hidden { display: none; }
+.backup-actions { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
 
 .translate-candidates { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }
 .translate-candidate {
