@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728x'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728x'
-import { el, clear } from './dom.js?v=20260728x'
-import { speak, speechSupported } from './speech.js?v=20260728x'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728x'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728x'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260728x'
-import { toWhisperInput } from './audio.js?v=20260728x'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728x'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260728x'
-import { generateExample } from './example.js?v=20260728x'
-import { translateEnglish } from './translate.js?v=20260728x'
+import { HSK1 } from '../data/hsk1.js?v=20260728y'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728y'
+import { el, clear } from './dom.js?v=20260728y'
+import { speak, speechSupported } from './speech.js?v=20260728y'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728y'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728y'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260728y'
+import { toWhisperInput } from './audio.js?v=20260728y'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728y'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260728y'
+import { generateExample } from './example.js?v=20260728y'
+import { translateEnglish } from './translate.js?v=20260728y'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -86,7 +86,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728x'
+const BUILD = '20260728y'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
