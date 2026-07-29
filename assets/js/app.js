@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260728z'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260728z'
-import { el, clear } from './dom.js?v=20260728z'
-import { speak, speechSupported } from './speech.js?v=20260728z'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260728z'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260728z'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260728z'
-import { toWhisperInput } from './audio.js?v=20260728z'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260728z'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260728z'
-import { generateExample } from './example.js?v=20260728z'
-import { translateEnglish } from './translate.js?v=20260728z'
+import { HSK1 } from '../data/hsk1.js?v=20260729a'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260729a'
+import { el, clear } from './dom.js?v=20260729a'
+import { speak, speechSupported } from './speech.js?v=20260729a'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260729a'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260729a'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260729a'
+import { toWhisperInput } from './audio.js?v=20260729a'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260729a'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260729a'
+import { generateExample } from './example.js?v=20260729a'
+import { translateEnglish } from './translate.js?v=20260729a'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -86,7 +86,7 @@ function setStrictness(level) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260728z'
+const BUILD = '20260729a'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -101,16 +101,33 @@ let words = [...HSK1, ...customWords]
 // Cross-session practice progress (best score + mastered status per hanzi),
 // so returning to the app continues instead of starting over.
 const progress = loadProgress()
-// Reassigned by practiceAgain() when continuing past a full pass, so keep
-// this `let` — other functions read it fresh via closure, not by value.
-let quiz = createQuiz(words, Math.random, progress.scores)
 // Hanzi pronounced acceptably (best attempt counts), restored from persisted
 // progress and updated as the learner scores new words.
 const mastered = new Set(progress.mastered)
+// Hanzi the learner flagged for priority: surfaced ahead of everything else
+// (even already-mastered words) on every fresh ordering, not just once.
+const priority = new Set(progress.priority)
+// Order every fresh pass the same way practiceAgain() does — flagged words,
+// then unattempted, then worst-scored-first — instead of a plain shuffle
+// that could just as easily open on an already-mastered word.
+const initialOrder = priorityOrder(words, progress.scores, Math.random, priority)
+// Reassigned by practiceAgain() when continuing past a full pass, so keep
+// this `let` — other functions read it fresh via closure, not by value.
+let quiz = createQuiz(words, Math.random, progress.scores, initialOrder)
 let recorder = null
 
 function persistProgress() {
-  saveProgress({ scores: quiz.snapshot(), mastered: [...mastered] })
+  saveProgress({ scores: quiz.snapshot(), mastered: [...mastered], priority: [...priority] })
+}
+
+// Toggle whether a word is flagged for priority practice, persisting the
+// change and re-rendering so the star button and word list reflect it.
+function togglePriority(hanzi) {
+  if (priority.has(hanzi)) priority.delete(hanzi)
+  else priority.add(hanzi)
+  persistProgress()
+  renderWord()
+  fillWordList(document.getElementById('wordlist'))
 }
 
 const HAN_RE = /[一-鿿]/
@@ -148,6 +165,7 @@ function removeCustomWord(hanzi) {
   saveCustomWords(customWords)
   quiz.removeWord(hanzi)
   mastered.delete(hanzi)
+  priority.delete(hanzi)
   persistProgress()
 }
 
@@ -459,13 +477,14 @@ function fillWordList(node) {
     const pct = scorePercent(a.score)
     const ok = pct >= ACCEPT_PERCENT
     const tip = `${a.word.pinyin} — ${a.word.en}`
+    const flagged = priority.has(a.word.hanzi)
     items.append(el('button', {
       class: `wl-item ${ok ? 'good' : 'bad'} ${a.index === cur ? 'current' : ''}`,
-      title: tip,
-      'aria-label': `${a.word.hanzi}, ${tip}, ${pct}%`,
+      title: flagged ? `${tip} — priority` : tip,
+      'aria-label': `${a.word.hanzi}, ${tip}, ${pct}%${flagged ? ', priority' : ''}`,
       onclick: () => jumpTo(a.index)
     }, [
-      el('span', { class: 'wl-hanzi', text: a.word.hanzi }),
+      el('span', { class: 'wl-hanzi', text: flagged ? `★ ${a.word.hanzi}` : a.word.hanzi }),
       el('span', { class: 'wl-pct', text: `${pct}%` })
     ]))
   }
@@ -568,6 +587,16 @@ function renderWord() {
   if (quiz.currentIndex() === 0) backAttrs.disabled = 'disabled'
 
   const wordCard = el('div', { class: 'card panel', id: 'word-card' }, [
+    el('button', {
+      class: `priority-toggle ${priority.has(word.hanzi) ? 'active' : ''}`,
+      title: priority.has(word.hanzi) ? 'Remove priority flag' : 'Flag for priority practice',
+      'aria-label': priority.has(word.hanzi) ? 'Remove priority flag' : 'Flag for priority practice',
+      text: priority.has(word.hanzi) ? '★' : '☆',
+      onpointerdown: (ev) => {
+        ev.preventDefault()
+        togglePriority(word.hanzi)
+      }
+    }),
     el('div', {
       class: 'hanzi word-speak',
       title: `${word.pinyin} — ${word.en}`,
@@ -1120,7 +1149,7 @@ function jumpTo(index) {
 // word. Scores/mastered carry over (no reload, no reset); only the order
 // and position are new.
 function practiceAgain() {
-  const order = priorityOrder(words, quiz.snapshot(), Math.random)
+  const order = priorityOrder(words, quiz.snapshot(), Math.random, priority)
   quiz = createQuiz(words, Math.random, quiz.snapshot(), order)
   renderWord()
 }

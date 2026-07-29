@@ -48,6 +48,17 @@ test('rejects missing or malformed progress', () => {
   assert.ok(validateBackup({ ...bases, progress: { scores: {}, mastered: 'nope' } }).error)
 })
 
+test('accepts progress with a priority array, and without one (older backups)', () => {
+  const bases = { customWords: [] }
+  assert.equal(validateBackup({ ...bases, progress: { scores: {}, mastered: [], priority: ['你好'] } }).ok, true)
+  assert.equal(validateBackup({ ...bases, progress: { scores: {}, mastered: [] } }).ok, true)
+})
+
+test('rejects progress with a non-array priority', () => {
+  const bases = { customWords: [] }
+  assert.ok(validateBackup({ ...bases, progress: { scores: {}, mastered: [], priority: 'nope' } }).error)
+})
+
 const coffee = { hanzi: '咖啡', pinyin: 'kā fēi', tones: [1, 1], en: 'coffee', custom: true }
 const cat = { hanzi: '猫', pinyin: 'māo', tones: [1], en: 'cat', custom: true }
 
@@ -72,6 +83,21 @@ test('mergeData unions mastered status without duplicates', () => {
   const merged = mergeData(existing, incoming)
   assert.deepEqual(new Set(merged.progress.mastered), new Set(['爱', '猫', '狗']))
   assert.equal(merged.progress.mastered.length, 3)
+})
+
+test('mergeData unions priority flags without duplicates', () => {
+  const existing = { customWords: [], progress: { scores: {}, mastered: [], priority: ['爱', '猫'] } }
+  const incoming = { customWords: [], progress: { scores: {}, mastered: [], priority: ['猫', '狗'] } }
+  const merged = mergeData(existing, incoming)
+  assert.deepEqual(new Set(merged.progress.priority), new Set(['爱', '猫', '狗']))
+  assert.equal(merged.progress.priority.length, 3)
+})
+
+test('mergeData treats a missing priority field (older data) as empty', () => {
+  const existing = { customWords: [], progress: { scores: {}, mastered: [] } }
+  const incoming = { customWords: [], progress: { scores: {}, mastered: [], priority: ['爱'] } }
+  const merged = mergeData(existing, incoming)
+  assert.deepEqual(merged.progress.priority, ['爱'])
 })
 
 test('mergeData does not mutate its inputs', () => {

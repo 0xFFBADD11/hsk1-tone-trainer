@@ -11,8 +11,8 @@
 // a learner would want to add, at a size safely below that limit on any
 // device.
 
-import { CEDICT_COMMON } from '../data/cedict-common.js?v=20260728z'
-import { numericPinyinToMarks } from './pinyin.js?v=20260728z'
+import { CEDICT_COMMON } from '../data/cedict-common.js?v=20260729a'
+import { numericPinyinToMarks } from './pinyin.js?v=20260729a'
 
 const MAX_CANDIDATES = 8
 

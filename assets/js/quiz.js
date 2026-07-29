@@ -14,21 +14,27 @@ export function shuffle(items, rand = Math.random) {
   return out
 }
 
-// Order words by practice priority, for continuing past a full pass: never-
-// attempted words first (shuffled among themselves, for variety), then
-// attempted words worst-score-first — so a new round focuses on what hasn't
-// been tried yet and what needs the most work, instead of a fresh random
-// shuffle that could just as easily start with an already-mastered word.
-// `scores` is a plain object keyed by hanzi (e.g. from Quiz.snapshot()).
-export function priorityOrder(words, scores, rand = Math.random) {
+// Order words by practice priority: flagged words first (shuffled among
+// themselves — these are surfaced ahead of everything else even if already
+// mastered, per the learner's explicit request), then never-attempted words
+// (also shuffled, for variety), then attempted words worst-score-first —
+// already-mastered words naturally sort to the end of that group since a
+// high score sorts last. Used both for continuing past a full pass and (with
+// no scores yet) for the very first ordering on a fresh page load, so a
+// fresh random shuffle never buries flagged/unattempted words behind
+// already-mastered ones. `scores` is a plain object keyed by hanzi (e.g.
+// from Quiz.snapshot()); `priority` is a Set of flagged hanzi.
+export function priorityOrder(words, scores, rand = Math.random, priority = new Set()) {
+  const flagged = []
   const unattempted = []
   const attempted = []
   for (const word of words) {
-    if (scores[word.hanzi] === undefined) unattempted.push(word)
+    if (priority.has(word.hanzi)) flagged.push(word)
+    else if (scores[word.hanzi] === undefined) unattempted.push(word)
     else attempted.push(word)
   }
   attempted.sort((a, b) => scores[a.hanzi] - scores[b.hanzi])
-  return [...shuffle(unattempted, rand), ...attempted]
+  return [...shuffle(flagged, rand), ...shuffle(unattempted, rand), ...attempted]
 }
 
 // `orderOverride`, if given, is used as the play order as-is instead of
