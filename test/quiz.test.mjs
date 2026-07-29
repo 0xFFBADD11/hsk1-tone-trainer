@@ -106,12 +106,29 @@ test('priorityOrder with no scores at all is equivalent to a full shuffle', () =
   assert.deepEqual(order, shuffle(words, () => 0))
 })
 
+test('priorityOrder puts flagged words first, even ahead of unattempted ones', () => {
+  const order = priorityOrder(words, { a: 0.9 }, () => 0, new Set(['c']))
+  assert.deepEqual(order.map((w) => w.hanzi), ['c', 'b', 'a'])
+})
+
+test('priorityOrder puts a flagged, already-mastered word ahead of a lower-scored one', () => {
+  const order = priorityOrder(words, { a: 0.9, b: 0.2, c: 0.95 }, () => 0, new Set(['c']))
+  assert.deepEqual(order.map((w) => w.hanzi), ['c', 'b', 'a'])
+})
+
+test('priorityOrder with an empty priority set matches the unflagged behavior', () => {
+  const order = priorityOrder(words, { a: 0.9, b: 0.2, c: 0.5 }, () => 0, new Set())
+  assert.deepEqual(order.map((w) => w.hanzi), ['b', 'c', 'a'])
+})
+
 test('priorityOrder does not mutate its inputs', () => {
   const wordsCopy = words.slice()
   const scores = { a: 0.9, b: 0.2 }
-  priorityOrder(words, scores, () => 0)
+  const priority = new Set(['c'])
+  priorityOrder(words, scores, () => 0, priority)
   assert.deepEqual(words, wordsCopy)
   assert.deepEqual(scores, { a: 0.9, b: 0.2 })
+  assert.deepEqual(priority, new Set(['c']))
 })
 
 test('createQuiz accepts an orderOverride instead of shuffling', () => {

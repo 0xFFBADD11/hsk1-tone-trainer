@@ -58,14 +58,15 @@ export function saveCustomWords(words) {
 // stored value is malformed.
 export function loadProgress() {
   const raw = safeGet(PROGRESS_KEY)
-  if (!raw) return { scores: {}, mastered: [] }
+  if (!raw) return { scores: {}, mastered: [], priority: [] }
   try {
     const parsed = JSON.parse(raw)
     const scores = parsed && typeof parsed.scores === 'object' && parsed.scores !== null ? parsed.scores : {}
     const mastered = Array.isArray(parsed && parsed.mastered) ? parsed.mastered : []
-    return { scores, mastered }
+    const priority = Array.isArray(parsed && parsed.priority) ? parsed.priority : []
+    return { scores, mastered, priority }
   } catch {
-    return { scores: {}, mastered: [] }
+    return { scores: {}, mastered: [], priority: [] }
   }
 }
 
@@ -112,7 +113,8 @@ export function validateBackup(data) {
   const progress = data.progress
   if (!progress || typeof progress !== 'object' ||
       typeof progress.scores !== 'object' || progress.scores === null ||
-      !Array.isArray(progress.mastered)) {
+      !Array.isArray(progress.mastered) ||
+      (progress.priority !== undefined && !Array.isArray(progress.priority))) {
     return { error: 'Missing or invalid progress data in this file.' }
   }
   return { ok: true, wordCount: data.customWords.length, scoreCount: Object.keys(progress.scores).length }
@@ -124,7 +126,7 @@ export function validateBackup(data) {
 // picks it up fresh rather than needing to be patched individually.
 export function applyBackup(data) {
   saveCustomWords(data.customWords)
-  saveProgress({ scores: data.progress.scores, mastered: data.progress.mastered })
+  saveProgress({ scores: data.progress.scores, mastered: data.progress.mastered, priority: data.progress.priority || [] })
   const prefs = data.prefs || {}
   if (prefs.strictness) safeSet(STRICTNESS_KEY, prefs.strictness)
   if (prefs.slow) safeSet(SLOW_KEY, prefs.slow)
@@ -137,8 +139,8 @@ export function applyBackup(data) {
 // wins on a collision, so a local edit made since the backup was taken isn't
 // clobbered — scores take the best (highest) of the two sides per word
 // (consistent with how a single session already only ever keeps a word's
-// best attempt), and mastered status is the union. Never loses data already
-// on this device, unlike a replace.
+// best attempt), and mastered/priority status is each the union. Never
+// loses data already on this device, unlike a replace.
 export function mergeData(existing, incoming) {
   const existingHanzi = new Set(existing.customWords.map((w) => w.hanzi))
   const customWords = [
@@ -151,8 +153,9 @@ export function mergeData(existing, incoming) {
     if (scores[hanzi] === undefined || score > scores[hanzi]) scores[hanzi] = score
   }
   const mastered = [...new Set([...existing.progress.mastered, ...incoming.progress.mastered])]
+  const priority = [...new Set([...(existing.progress.priority || []), ...(incoming.progress.priority || [])])]
 
-  return { customWords, progress: { scores, mastered } }
+  return { customWords, progress: { scores, mastered, priority } }
 }
 
 // Merge an already-validated backup into what's currently saved (see

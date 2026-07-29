@@ -115,6 +115,21 @@ main {
 .card.pass { box-shadow: 0 0 0 3px var(--good), 0 8px 30px rgba(0, 0, 0, 0.35); }
 .card.fail { box-shadow: 0 0 0 3px var(--bad), 0 8px 30px rgba(0, 0, 0, 0.35); }
 
+#word-card { position: relative; }
+.priority-toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.9rem;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.15rem;
+}
+.priority-toggle.active { color: var(--warn); }
+
 .hanzi { font-size: 4.5rem; line-height: 1.1; }
 .hanzi.word-speak { cursor: pointer; }
 .pinyin { font-size: 1.6rem; color: var(--accent-soft); margin-top: 0.4rem; }
