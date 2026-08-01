@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260729c'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260729c'
-import { el, clear } from './dom.js?v=20260729c'
-import { speak, speakWhenReady, speechSupported } from './speech.js?v=20260729c'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260729c'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260729c'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260729c'
-import { toWhisperInput } from './audio.js?v=20260729c'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260729c'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260729c'
-import { generateExample } from './example.js?v=20260729c'
-import { translateEnglish } from './translate.js?v=20260729c'
+import { HSK1 } from '../data/hsk1.js?v=20260801a'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260801a'
+import { el, clear } from './dom.js?v=20260801a'
+import { speak, speakWhenReady, speechSupported } from './speech.js?v=20260801a'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260801a'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260801a'
+import { createQuiz, priorityOrder } from './quiz.js?v=20260801a'
+import { toWhisperInput } from './audio.js?v=20260801a'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260801a'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260801a'
+import { generateExample } from './example.js?v=20260801a'
+import { translateEnglish } from './translate.js?v=20260801a'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -84,9 +84,56 @@ function setStrictness(level) {
   }
 }
 
+// How many words make up one practice pass. 'all' means no limit. Kept as
+// strings (matching localStorage and STRICTNESS's pattern) since 'all' isn't
+// a number.
+const SESSION_SIZES = ['10', '25', '50', 'all']
+const DEFAULT_SESSION_SIZE = '25'
+
+function loadSessionSize() {
+  try {
+    const v = window.localStorage.getItem('session-size')
+    if (v && SESSION_SIZES.includes(v)) return v
+  } catch {
+    // localStorage may be unavailable (private mode); fall through to default.
+  }
+  return DEFAULT_SESSION_SIZE
+}
+
+let sessionSize = loadSessionSize()
+
+// Slice a priority-ordered word list down to the current session size —
+// applied on top of priorityOrder() so a session still opens with whatever
+// most needs practice (flagged, then unattempted, then worst-scored) rather
+// than an arbitrary N words.
+function applySessionSize(order) {
+  if (sessionSize === 'all') return order
+  return order.slice(0, Number(sessionSize))
+}
+
+function setSessionSize(size) {
+  if (!SESSION_SIZES.includes(size)) return
+  sessionSize = size
+  try {
+    window.localStorage.setItem('session-size', size)
+  } catch {
+    // Non-fatal: the choice just won't persist across reloads.
+  }
+  const box = document.getElementById('session-size')
+  if (box) {
+    for (const btn of box.querySelectorAll('.chip')) {
+      btn.classList.toggle('active', btn.dataset.size === size)
+    }
+  }
+  // Start a freshly-sized session immediately rather than waiting for the
+  // current pass to end — no progress is lost, since scores are persisted
+  // by hanzi regardless of session boundaries.
+  practiceAgain()
+}
+
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260729c'
+const BUILD = '20260801a'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -109,8 +156,9 @@ const mastered = new Set(progress.mastered)
 const priority = new Set(progress.priority)
 // Order every fresh pass the same way practiceAgain() does — flagged words,
 // then unattempted, then worst-scored-first — instead of a plain shuffle
-// that could just as easily open on an already-mastered word.
-const initialOrder = priorityOrder(words, progress.scores, Math.random, priority)
+// that could just as easily open on an already-mastered word. Sliced down
+// to the configured session size (see applySessionSize).
+const initialOrder = applySessionSize(priorityOrder(words, progress.scores, Math.random, priority))
 // Reassigned by practiceAgain() when continuing past a full pass, so keep
 // this `let` — other functions read it fresh via closure, not by value.
 let quiz = createQuiz(words, Math.random, progress.scores, initialOrder)
@@ -266,6 +314,21 @@ function renderStrictness() {
   ])
 }
 
+// Session-size selector, rendered at the bottom of the practice view.
+function renderSessionSize() {
+  return el('div', { class: 'strictness', id: 'session-size' }, [
+    el('span', { class: 'strictness-label', text: 'Session size' }),
+    ...SESSION_SIZES.map((size) =>
+      el('button', {
+        class: `chip ${size === sessionSize ? 'active' : ''}`,
+        'data-size': size,
+        text: size === 'all' ? 'All' : size,
+        onclick: () => setSessionSize(size)
+      })
+    )
+  ])
+}
+
 // Strictness + toggles (slow playback, pronunciation), grouped at the bottom.
 function renderSettings() {
   const children = [
@@ -275,7 +338,8 @@ function renderSettings() {
       text: '🐢 Slow',
       onclick: () => toggleSlow()
     }),
-    renderStrictness()
+    renderStrictness(),
+    renderSessionSize()
   ]
   if (pronounceSupported()) {
     children.push(el('button', {
@@ -1163,7 +1227,7 @@ function jumpTo(index) {
 // word. Scores/mastered carry over (no reload, no reset); only the order
 // and position are new.
 function practiceAgain() {
-  const order = priorityOrder(words, quiz.snapshot(), Math.random, priority)
+  const order = applySessionSize(priorityOrder(words, quiz.snapshot(), Math.random, priority))
   quiz = createQuiz(words, Math.random, quiz.snapshot(), order)
   renderWord()
 }
