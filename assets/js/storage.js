@@ -8,6 +8,7 @@ const PROGRESS_KEY = 'progress'
 const STRICTNESS_KEY = 'strictness'
 const SLOW_KEY = 'slow'
 const PRON_KEY = 'pron'
+const SESSION_SIZE_KEY = 'session-size'
 
 // Bump if the backup shape ever changes incompatibly.
 const BACKUP_VERSION = 1
@@ -92,7 +93,8 @@ export function exportBackup() {
     prefs: {
       strictness: safeGet(STRICTNESS_KEY),
       slow: safeGet(SLOW_KEY),
-      pron: safeGet(PRON_KEY)
+      pron: safeGet(PRON_KEY),
+      sessionSize: safeGet(SESSION_SIZE_KEY)
     }
   }
 }
@@ -131,6 +133,7 @@ export function applyBackup(data) {
   if (prefs.strictness) safeSet(STRICTNESS_KEY, prefs.strictness)
   if (prefs.slow) safeSet(SLOW_KEY, prefs.slow)
   if (prefs.pron) safeSet(PRON_KEY, prefs.pron)
+  if (prefs.sessionSize) safeSet(SESSION_SIZE_KEY, prefs.sessionSize)
 }
 
 // Pure merge of two { customWords, progress } shaped objects (as returned by
