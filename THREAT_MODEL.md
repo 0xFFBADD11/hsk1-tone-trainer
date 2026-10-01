@@ -10,8 +10,13 @@
 1. **Browser ↔ microphone.** `getUserMedia` requires an explicit user grant and
    a secure context (HTTPS). Audio is consumed in-page and discarded after the
    pitch contour is computed; nothing is stored or sent.
-2. **Browser ↔ edge (Cloudflare Worker).** The Worker serves static assets and
-   only accepts `GET`/`HEAD`. It adds security headers to every response.
+2. **Browser ↔ edge (Cloudflare Worker or GitHub Pages).** The Worker serves
+   static assets and only accepts `GET`/`HEAD`. It adds security headers to
+   every response. Pages relies on the equivalent `<meta>` CSP.
+3. **Browser ↔ jsDelivr.** The page dynamically imports pinned library builds
+   (`pinyin-pro`, Transformers.js) and their ONNX runtime. Microphone audio
+   and pitch data are not sent there. Model files load from this origin
+   (`env.allowRemoteModels = false`).
 
 ## Inputs and Validation
 
