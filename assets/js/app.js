@@ -1,17 +1,17 @@
 // The ?v= token must match index.html so the whole module graph is refetched
 // together when a deploy changes it; bump both on every deploy.
-import { HSK1 } from '../data/hsk1.js?v=20260801a'
-import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20260801a'
-import { el, clear } from './dom.js?v=20260801a'
-import { speak, speakWhenReady, speechSupported } from './speech.js?v=20260801a'
-import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20260801a'
-import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20260801a'
-import { createQuiz, priorityOrder } from './quiz.js?v=20260801a'
-import { toWhisperInput } from './audio.js?v=20260801a'
-import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20260801a'
-import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20260801a'
-import { generateExample } from './example.js?v=20260801a'
-import { translateEnglish } from './translate.js?v=20260801a'
+import { HSK1 } from '../data/hsk1.js?v=20261001a'
+import { HSK1_EXAMPLES } from '../data/hsk1-examples.js?v=20261001a'
+import { el, clear } from './dom.js?v=20261001a'
+import { speak, speakWhenReady, speechSupported } from './speech.js?v=20261001a'
+import { recordPitchContour, microphoneSupported, primeAudio } from './pitch.js?v=20261001a'
+import { scoreWord, scoreWordInSentence, TONE_NAMES, parseTonesFromPinyin } from './tone.js?v=20261001a'
+import { createQuiz, priorityOrder } from './quiz.js?v=20261001a'
+import { toWhisperInput } from './audio.js?v=20261001a'
+import { pronounceSupported, pronounceReady, loadModel, transcribe, cleanHeard, tonelessPinyin, bestWindowCloseness } from './pronounce.js?v=20261001a'
+import { loadCustomWords, saveCustomWords, loadProgress, saveProgress, clearProgress, exportBackup, validateBackup, applyBackup, mergeBackup } from './storage.js?v=20261001a'
+import { generateExample } from './example.js?v=20261001a'
+import { translateEnglish } from './translate.js?v=20261001a'
 
 // Playback rates. 0.85 is "normal"; Slow mode (a toggle) plays everything well
 // below that so the contrast is clearly audible.
@@ -133,7 +133,7 @@ function setSessionSize(size) {
 
 // Visible build stamp. The footer placeholder says "stale cache" until this
 // line runs, so the badge proves the current app.js actually executed.
-const BUILD = '20260801a'
+const BUILD = '20261001a'
 const buildEl = document.getElementById('build')
 if (buildEl) buildEl.textContent = BUILD
 
@@ -407,7 +407,7 @@ let pinyinFn = null
 async function ensurePinyin() {
   if (pinyinFn) return pinyinFn
   try {
-    const mod = await import('https://cdn.jsdelivr.net/npm/pinyin-pro@3/+esm')
+    const mod = await import('https://cdn.jsdelivr.net/npm/pinyin-pro@3.29.4/+esm')
     pinyinFn = mod.pinyin
   } catch {
     pinyinFn = null
